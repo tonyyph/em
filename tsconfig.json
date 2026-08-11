@@ -8,15 +8,13 @@
       ]
     },
     "types": [
-      "jest",
-      "nativewind/types"
+      "jest"
     ]
   },
   "include": [
     "app",
     "src",
     "__tests__",
-    "nativewind-env.d.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
   ]

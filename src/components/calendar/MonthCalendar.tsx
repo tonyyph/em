@@ -1,12 +1,23 @@
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring
+} from "react-native-reanimated";
+import { AppText } from "@/components/common/AppText";
+import { useTheme, type Theme } from "@/design/theme";
+import { motion, radius, spacing } from "@/design/tokens";
 import type { Cycle, CyclePrediction } from "@/domain/entities/cycle";
 import type { SymptomLog } from "@/domain/entities/symptom";
 import { dayjs, toIsoDate } from "@/utils/date/dayjs";
-import { AppText } from "@/components/common/AppText";
-import { colors, layout, phaseMeta, radius, spacing } from "@/design/tokens";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const WEEKDAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
 type MonthCalendarProps = {
   month?: string;
@@ -20,26 +31,90 @@ type MonthCalendarProps = {
 type DayState = {
   loggedPeriod: boolean;
   predictedPeriod: boolean;
+  /** Inside the widened range shown when cycles are irregular. */
+  predictedRange: boolean;
   fertile: boolean;
   ovulation: boolean;
   symptom: boolean;
 };
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const getDayState = (
+  date: string,
+  cycles: Cycle[],
+  symptoms: SymptomLog[],
+  prediction: CyclePrediction
+): DayState => {
+  const day = dayjs(date);
 
-const getDayState = (date: string, cycles: Cycle[], symptoms: SymptomLog[], prediction: CyclePrediction): DayState => {
   const loggedPeriod = cycles.some((cycle) => {
-    const end = cycle.endDate ?? dayjs(cycle.startDate).add(4, "day").format("YYYY-MM-DD");
-    return dayjs(date).isBetween(cycle.startDate, end, "day", "[]");
+    // Fall back to the predicted period length rather than a fixed 5 days, so
+    // a cycle logged without an end date is not silently mis-drawn.
+    const end =
+      cycle.endDate ??
+      dayjs(cycle.startDate)
+        .add(Math.max(prediction.averagePeriodLength - 1, 0), "day")
+        .format("YYYY-MM-DD");
+    return day.isBetween(cycle.startDate, end, "day", "[]");
   });
+
+  const range = prediction.nextPeriodRange;
 
   return {
     loggedPeriod,
-    predictedPeriod: dayjs(date).isBetween(prediction.nextPeriodStart, prediction.nextPeriodEnd, "day", "[]"),
-    fertile: dayjs(date).isBetween(prediction.fertileWindowStart, prediction.fertileWindowEnd, "day", "[]"),
+    predictedPeriod: day.isBetween(
+      prediction.nextPeriodStart,
+      prediction.nextPeriodEnd,
+      "day",
+      "[]"
+    ),
+    predictedRange: range
+      ? day.isBetween(range.earliest, range.latest, "day", "[]")
+      : false,
+    fertile: day.isBetween(
+      prediction.fertileWindowStart,
+      prediction.fertileWindowEnd,
+      "day",
+      "[]"
+    ),
     ovulation: date === prediction.ovulationDay,
     symptom: symptoms.some((symptom) => symptom.date === date)
   };
+};
+
+/**
+ * Marker grammar, in priority order. Recorded facts always outrank estimates:
+ * a logged period is a solid fill, everything predicted is softer, and the
+ * irregularity range is only a tint — it is the weakest claim the app makes.
+ */
+const describeDay = (state: DayState, theme: Theme) => {
+  const { colors } = theme;
+  if (state.loggedPeriod) {
+    return { ground: colors.phases.menstrual, text: colors.textOnAction, dashed: false };
+  }
+  if (state.ovulation) {
+    return { ground: colors.phaseSoft.ovulation, text: colors.phases.ovulation, dashed: false };
+  }
+  if (state.predictedPeriod) {
+    return { ground: "transparent", text: colors.phases.menstrual, dashed: true };
+  }
+  if (state.fertile) {
+    return { ground: colors.phaseSoft.fertile, text: colors.phases.fertile, dashed: false };
+  }
+  if (state.predictedRange) {
+    return { ground: colors.phaseSoft.menstrual, text: colors.textSecondary, dashed: false };
+  }
+  return { ground: "transparent", text: null, dashed: false };
+};
+
+const accessibilityFor = (date: string, state: DayState) => {
+  const notes: string[] = [];
+  if (state.loggedPeriod) notes.push("period logged");
+  if (state.predictedPeriod) notes.push("predicted period");
+  else if (state.predictedRange) notes.push("possible period, cycle is irregular");
+  if (state.ovulation) notes.push("estimated ovulation");
+  else if (state.fertile) notes.push("fertile window");
+  if (state.symptom) notes.push("symptom logged");
+  return `${dayjs(date).format("dddd, MMMM D")}${notes.length ? `. ${notes.join(", ")}` : ""}`;
 };
 
 function CalendarDay({
@@ -57,148 +132,85 @@ function CalendarDay({
   state: DayState;
   onPress: () => void;
 }) {
+  const theme = useTheme();
+  const { colors, reduceMotion } = theme;
   const scale = useSharedValue(1);
+
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: withSpring(scale.value, { damping: 16, stiffness: 180 }) }]
+    transform: [{ scale: scale.value }]
   }));
-  const markerColor = state.loggedPeriod
-    ? colors.phases.menstrual
-    : state.ovulation
-      ? colors.phases.ovulation
-      : state.fertile
-        ? colors.phases.fertile
-        : state.predictedPeriod
-          ? "#E7B5B1"
-          : "transparent";
+
+  const tone = describeDay(state, theme);
+  const textColor = isCurrentMonth
+    ? (tone.text ?? colors.textPrimary)
+    : colors.textMuted;
 
   return (
     <AnimatedPressable
       accessibilityRole="button"
-      accessibilityLabel={`${dayjs(date).format("MMMM D")}${state.loggedPeriod ? ", period logged" : ""}${state.ovulation ? ", estimated ovulation" : ""}`}
-      onPress={onPress}
+      accessibilityState={{ selected: isSelected }}
+      accessibilityLabel={accessibilityFor(date, state)}
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
       onPressIn={() => {
-        scale.value = 0.94;
+        if (!reduceMotion) scale.value = withSpring(0.9, motion.spring);
       }}
       onPressOut={() => {
-        scale.value = 1;
+        if (!reduceMotion) scale.value = withSpring(1, motion.spring);
       }}
       style={[styles.day, animatedStyle]}
     >
-      <View style={[styles.dayShell, isSelected ? styles.selectedDay : undefined, isToday ? styles.todayDay : undefined]}>
-        <AppText variant="label" color={isCurrentMonth ? "textPrimary" : "textMuted"}>
+      <View
+        style={[
+          styles.dayShell,
+          {
+            backgroundColor: isCurrentMonth ? tone.ground : "transparent",
+            borderColor: tone.dashed && isCurrentMonth ? colors.phases.menstrual : "transparent",
+            borderStyle: tone.dashed ? "dashed" : "solid",
+            borderWidth: tone.dashed && isCurrentMonth ? 1.5 : 0
+          },
+          isSelected
+            ? { borderWidth: 2, borderStyle: "solid", borderColor: colors.textPrimary }
+            : undefined
+        ]}
+      >
+        <AppText variant="label" style={{ color: textColor }}>
           {dayjs(date).date()}
         </AppText>
-        <View style={styles.markerRow}>
-          {markerColor !== "transparent" ? (
-            <View style={[styles.primaryMarker, state.ovulation ? styles.ovulationMarker : undefined, { backgroundColor: markerColor }]} />
-          ) : null}
-          {state.symptom ? <View style={styles.symptomMarker} /> : null}
-        </View>
+      </View>
+
+      <View style={styles.markerRow}>
+        {state.symptom && isCurrentMonth ? (
+          <View style={[styles.symptomDot, { backgroundColor: colors.phases.wellness }]} />
+        ) : null}
+        {isToday ? (
+          <View style={[styles.todayDot, { backgroundColor: colors.focus }]} />
+        ) : null}
       </View>
     </AnimatedPressable>
   );
 }
 
-export function MonthCalendar({ month, cycles, symptoms = [], prediction, selectedDate, onSelectDate }: MonthCalendarProps) {
-  const [visibleMonth, setVisibleMonth] = useState(dayjs(month ?? selectedDate).startOf("month"));
-  const gridStart = visibleMonth.startOf("week");
-  const today = toIsoDate(new Date());
-  const days = useMemo(() => Array.from({ length: 42 }, (_, index) => gridStart.add(index, "day")), [gridStart]);
-  const selectedState = getDayState(selectedDate, cycles, symptoms, prediction);
-
+function LegendPill({
+  label,
+  color,
+  dashed = false
+}: {
+  label: string;
+  color: string;
+  dashed?: boolean;
+}) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.root}>
-      <View style={styles.header}>
-        <View>
-          <AppText variant="caption" color="textMuted">
-            Calendar atlas
-          </AppText>
-          <AppText variant="sectionTitle">{visibleMonth.format("MMMM YYYY")}</AppText>
-        </View>
-        <View style={styles.monthActions}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Previous month"
-            hitSlop={8}
-            onPress={() => setVisibleMonth((current) => current.subtract(1, "month"))}
-            style={styles.monthButton}
-          >
-            <Ionicons name="chevron-back" size={18} color={colors.textPrimary} />
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Next month"
-            hitSlop={8}
-            onPress={() => setVisibleMonth((current) => current.add(1, "month"))}
-            style={styles.monthButton}
-          >
-            <Ionicons name="chevron-forward" size={18} color={colors.textPrimary} />
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.weekRow}>
-        {["S", "M", "T", "W", "T", "F", "S"].map((item, index) => (
-          <AppText key={`${item}-${index}`} variant="caption" color="textMuted" style={styles.weekLabel}>
-            {item}
-          </AppText>
-        ))}
-      </View>
-
-      <View style={styles.grid}>
-        {days.map((day) => {
-          const date = toIsoDate(day);
-          return (
-            <CalendarDay
-              key={date}
-              date={date}
-              isCurrentMonth={day.month() === visibleMonth.month()}
-              isSelected={date === selectedDate}
-              isToday={date === today}
-              state={getDayState(date, cycles, symptoms, prediction)}
-              onPress={() => onSelectDate(date)}
-            />
-          );
-        })}
-      </View>
-
-      <View style={styles.detail}>
-        <View style={styles.detailCopy}>
-          <AppText variant="caption" color="textMuted">
-            Selected day
-          </AppText>
-          <AppText variant="cardTitle">{dayjs(selectedDate).format("dddd, MMM D")}</AppText>
-        </View>
-        <View style={styles.detailTags}>
-          {selectedState.loggedPeriod ? <LegendPill label="Period" color={colors.phases.menstrual} /> : null}
-          {selectedState.predictedPeriod && !selectedState.loggedPeriod ? <LegendPill label="Predicted" color="#E7B5B1" /> : null}
-          {selectedState.fertile ? <LegendPill label="Fertile" color={colors.phases.fertile} /> : null}
-          {selectedState.ovulation ? <LegendPill label="Ovulation" color={colors.phases.ovulation} diamond /> : null}
-          {!selectedState.loggedPeriod && !selectedState.predictedPeriod && !selectedState.fertile && !selectedState.ovulation ? (
-            <LegendPill label="Wellness" color={colors.phases.wellness} />
-          ) : null}
-        </View>
-      </View>
-
-      <View style={styles.legend}>
-        <LegendPill label={phaseMeta.menstrual.shortLabel} color={colors.phases.menstrual} />
-        <LegendPill label="Predicted" color="#E7B5B1" />
-        <LegendPill label={phaseMeta.fertile.shortLabel} color={colors.phases.fertile} />
-        <LegendPill label={phaseMeta.ovulation.shortLabel} color={colors.phases.ovulation} diamond />
-        <LegendPill label="Symptom" color={colors.textPrimary} outline />
-      </View>
-    </View>
-  );
-}
-
-function LegendPill({ label, color, diamond, outline }: { label: string; color: string; diamond?: boolean; outline?: boolean }) {
-  return (
-    <View style={styles.legendPill}>
+    <View style={[styles.legendPill, { backgroundColor: colors.surfaceMuted }]}>
       <View
         style={[
-          styles.legendDot,
-          diamond ? styles.legendDiamond : undefined,
-          outline ? styles.legendOutline : { backgroundColor: color, borderColor: color }
+          styles.legendSwatch,
+          dashed
+            ? { borderWidth: 1.5, borderStyle: "dashed", borderColor: color }
+            : { backgroundColor: color }
         ]}
       />
       <AppText variant="caption" color="textSecondary">
@@ -208,19 +220,130 @@ function LegendPill({ label, color, diamond, outline }: { label: string; color: 
   );
 }
 
+export function MonthCalendar({
+  month,
+  cycles,
+  symptoms = [],
+  prediction,
+  selectedDate,
+  onSelectDate
+}: MonthCalendarProps) {
+  const { colors, elevation, reduceMotion } = useTheme();
+  const [visibleMonth, setVisibleMonth] = useState(() =>
+    dayjs(month ?? selectedDate).startOf("month")
+  );
+
+  const gridStart = visibleMonth.startOf("week");
+  const today = toIsoDate(new Date());
+
+  const days = useMemo(
+    () => Array.from({ length: 42 }, (_, index) => gridStart.add(index, "day")),
+    [gridStart]
+  );
+
+  const step = (delta: number) => {
+    Haptics.selectionAsync().catch(() => {});
+    setVisibleMonth((current) => current.add(delta, "month"));
+  };
+
+  return (
+    <View
+      style={[
+        styles.root,
+        elevation.raised,
+        { backgroundColor: colors.surface, borderColor: colors.border }
+      ]}
+    >
+      <View style={styles.header}>
+        <View style={styles.headerCopy}>
+          <AppText variant="eyebrow" color="textMuted">
+            Cycle atlas
+          </AppText>
+          <AppText variant="sectionTitle">{visibleMonth.format("MMMM YYYY")}</AppText>
+        </View>
+        <View style={styles.monthActions}>
+          {([
+            ["chevron-back", -1],
+            ["chevron-forward", 1]
+          ] as const).map(([icon, delta]) => (
+            <Pressable
+              key={icon}
+              accessibilityRole="button"
+              accessibilityLabel={delta < 0 ? "Previous month" : "Next month"}
+              hitSlop={6}
+              onPress={() => step(delta)}
+              style={({ pressed }) => [
+                styles.monthButton,
+                {
+                  backgroundColor: colors.surfaceMuted,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.6 : 1
+                }
+              ]}
+            >
+              <Ionicons name={icon} size={17} color={colors.textPrimary} />
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.weekdays}>
+        {WEEKDAYS.map((weekday, index) => (
+          <View key={`${weekday}-${index}`} style={styles.weekdayCell}>
+            <AppText variant="caption" color="textMuted">
+              {weekday}
+            </AppText>
+          </View>
+        ))}
+      </View>
+
+      <Animated.View
+        key={visibleMonth.format("YYYY-MM")}
+        entering={reduceMotion ? undefined : FadeIn.duration(motion.duration.base)}
+        style={styles.grid}
+      >
+        {days.map((day) => {
+          const iso = day.format("YYYY-MM-DD");
+          return (
+            <CalendarDay
+              key={iso}
+              date={iso}
+              isCurrentMonth={day.month() === visibleMonth.month()}
+              isSelected={iso === selectedDate}
+              isToday={iso === today}
+              state={getDayState(iso, cycles, symptoms, prediction)}
+              onPress={() => onSelectDate(iso)}
+            />
+          );
+        })}
+      </Animated.View>
+
+      <View style={[styles.legend, { borderTopColor: colors.separator }]}>
+        <LegendPill label="Period" color={colors.phases.menstrual} />
+        <LegendPill label="Predicted" color={colors.phases.menstrual} dashed />
+        <LegendPill label="Fertile" color={colors.phaseSoft.fertile} />
+        <LegendPill label="Ovulation" color={colors.phases.ovulation} />
+        <LegendPill label="Logged" color={colors.phases.wellness} />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: {
     borderRadius: radius.xl,
-    backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
     padding: spacing.md
   },
   header: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
     marginBottom: spacing.md
+  },
+  headerCopy: {
+    flex: 1
   },
   monthActions: {
     flexDirection: "row",
@@ -230,17 +353,17 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: radius.full,
-    backgroundColor: colors.backgroundMuted,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center"
   },
-  weekRow: {
+  weekdays: {
     flexDirection: "row",
-    marginBottom: spacing.xs
+    marginBottom: spacing.xxs
   },
-  weekLabel: {
+  weekdayCell: {
     width: `${100 / 7}%`,
-    textAlign: "center"
+    alignItems: "center"
   },
   grid: {
     flexDirection: "row",
@@ -249,96 +372,53 @@ const styles = StyleSheet.create({
   day: {
     width: `${100 / 7}%`,
     aspectRatio: 1,
-    padding: 3,
-    minHeight: layout.minTouchTarget
-  },
-  dayShell: {
-    flex: 1,
-    borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "transparent"
+    paddingVertical: 2
   },
-  selectedDay: {
-    backgroundColor: colors.backgroundMuted,
-    borderColor: colors.textPrimary
-  },
-  todayDay: {
-    borderColor: colors.focus
+  dayShell: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
+    alignItems: "center",
+    justifyContent: "center"
   },
   markerRow: {
-    position: "absolute",
-    bottom: 5,
+    height: 8,
     flexDirection: "row",
+    alignItems: "center",
     gap: 3,
-    alignItems: "center"
+    marginTop: 1
   },
-  primaryMarker: {
-    width: 16,
-    height: 3,
+  symptomDot: {
+    width: 4,
+    height: 4,
     borderRadius: radius.full
   },
-  ovulationMarker: {
-    width: 7,
-    height: 7,
-    borderRadius: 1,
-    transform: [{ rotate: "45deg" }]
-  },
-  symptomMarker: {
-    width: 5,
-    height: 5,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.textPrimary
-  },
-  detail: {
-    marginTop: spacing.md,
-    paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
-    flexDirection: "row",
-    gap: spacing.md,
-    justifyContent: "space-between",
-    alignItems: "center"
-  },
-  detailCopy: {
-    flex: 1
-  },
-  detailTags: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-    justifyContent: "flex-end",
-    flex: 1
+  todayDot: {
+    width: 4,
+    height: 4,
+    borderRadius: radius.full
   },
   legend: {
-    marginTop: spacing.md,
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.xs
+    gap: spacing.xxs,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth
   },
   legendPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
+    gap: spacing.xxs,
     borderRadius: radius.full,
-    backgroundColor: colors.backgroundMuted
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 4
   },
-  legendDot: {
+  legendSwatch: {
     width: 9,
     height: 9,
-    borderRadius: radius.full,
-    borderWidth: 1
-  },
-  legendDiamond: {
-    borderRadius: 1,
-    transform: [{ rotate: "45deg" }]
-  },
-  legendOutline: {
-    backgroundColor: "transparent",
-    borderColor: colors.textPrimary
+    borderRadius: radius.full
   }
 });

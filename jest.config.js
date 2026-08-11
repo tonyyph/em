@@ -8,6 +8,6 @@ module.exports = {
     "^.+\\.[jt]sx?$": "babel-jest"
   },
   transformIgnorePatterns: [
-    "node_modules/(?!((jest-)?react-native|@react-native|expo|expo-.*|@expo/.*|expo-router|nativewind|react-native-reanimated|react-native-worklets|@react-native-async-storage)/)"
+    "node_modules/(?!((jest-)?react-native|@react-native|expo|expo-.*|@expo/.*|expo-router|react-native-reanimated|react-native-worklets|@react-native-async-storage)/)"
   ]
 };

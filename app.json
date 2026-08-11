@@ -16,7 +16,9 @@
     },
     "android": {
       "package": "com.em.cyclehealth",
-      "permissions": ["POST_NOTIFICATIONS"]
+      "permissions": [
+        "POST_NOTIFICATIONS"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -26,7 +28,17 @@
       [
         "expo-notifications",
         {
-          "color": "#E95670"
+          "color": "#7E3F46"
+        }
+      ],
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FBF6EF",
+          "dark": {
+            "backgroundColor": "#141010"
+          }
         }
       ]
     ],

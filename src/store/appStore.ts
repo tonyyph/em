@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { AppUser } from "@/domain/entities/user";
-import type { Cycle, CycleConfig } from "@/domain/entities/cycle";
+import type { Cycle, CycleConfig, FlowIntensity } from "@/domain/entities/cycle";
+import { applyPeriodDay, removePeriodDay } from "@/utils/algorithms/periodLog";
 import type { OvulationLog } from "@/domain/entities/ovulation";
 import type { Pregnancy } from "@/domain/entities/pregnancy";
 import type { SymptomLog } from "@/domain/entities/symptom";
@@ -20,6 +21,9 @@ type AppState = {
   removeCycle: (id: string) => void;
   setSymptoms: (symptoms: SymptomLog[]) => void;
   upsertSymptom: (symptom: SymptomLog) => void;
+  removeSymptom: (id: string) => void;
+  /** Records or clears a bleeding day without fabricating one-day cycles. */
+  setPeriodDay: (date: string, flow: FlowIntensity | undefined) => void;
   setOvulationLogs: (logs: OvulationLog[]) => void;
   upsertOvulationLog: (log: OvulationLog) => void;
   setPregnancy: (pregnancy?: Pregnancy) => void;
@@ -52,6 +56,14 @@ export const useAppStore = create<AppState>((set) => ({
       symptoms: state.symptoms.some((item) => item.id === symptom.id)
         ? state.symptoms.map((item) => (item.id === symptom.id ? symptom : item))
         : [...state.symptoms, symptom]
+    })),
+  removeSymptom: (id) =>
+    set((state) => ({ symptoms: state.symptoms.filter((symptom) => symptom.id !== id) })),
+  setPeriodDay: (date, flow) =>
+    set((state) => ({
+      cycles: flow
+        ? applyPeriodDay(state.cycles, date, flow)
+        : removePeriodDay(state.cycles, date)
     })),
   setOvulationLogs: (ovulationLogs) => set({ ovulationLogs }),
   upsertOvulationLog: (log) =>
