@@ -1,4 +1,4 @@
-import { createAsyncStorage } from "@react-native-async-storage/async-storage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions } from "firebase/app";
 import { getAuth, initializeAuth, type Auth, type Persistence } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
@@ -43,11 +43,11 @@ const getReactNativeAuthPersistence = (): Persistence | undefined => {
   // Firebase exposes the React Native persistence helper through the React Native resolver condition.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const authModule = require("firebase/auth") as {
-    getReactNativePersistence?: (storage: ReturnType<typeof createAsyncStorage>) => Persistence;
+    getReactNativePersistence?: (storage: typeof AsyncStorage) => Persistence;
   };
   const getReactNativePersistence = authModule.getReactNativePersistence;
 
-  return getReactNativePersistence?.(createAsyncStorage("em-auth"));
+  return getReactNativePersistence?.(AsyncStorage);
 };
 
 export const getFirebaseApp = () => {
