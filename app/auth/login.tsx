@@ -1,0 +1,80 @@
+import { useState } from "react";
+import { Link, router } from "expo-router";
+import { StyleSheet, View } from "react-native";
+import { AppHeader } from "@/components/common/AppHeader";
+import { AppText } from "@/components/common/AppText";
+import { Button } from "@/components/common/Button";
+import { InfoBanner } from "@/components/common/InfoBanner";
+import { Screen } from "@/components/common/Screen";
+import { TextField } from "@/components/forms/TextField";
+import { authService } from "@/services/firebase/authService";
+import { spacing } from "@/design/tokens";
+
+export default function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string>();
+  const [loading, setLoading] = useState(false);
+
+  const login = async () => {
+    try {
+      setLoading(true);
+      setError(undefined);
+      await authService.loginWithEmail(email.trim(), password);
+      router.replace("/(tabs)");
+    } catch {
+      setError("Cloud sign-in is unavailable until Firebase env values are configured.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const anonymous = async () => {
+    try {
+      await authService.loginAnonymously();
+    } catch {
+      // Local-only mode remains available without Firebase.
+    } finally {
+      router.replace("/(tabs)");
+    }
+  };
+
+  return (
+    <Screen>
+      <AppHeader eyebrow="Private account" title="Welcome back" subtitle="Sync when Firebase is configured, or stay local with anonymous mode." />
+      {!authService.isConfigured() ? (
+        <InfoBanner title="Cloud sync is not configured" body="The app still runs in local anonymous mode. Fill .env to enable email auth." tone="warning" />
+      ) : null}
+      <View style={styles.form}>
+        <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" textContentType="emailAddress" />
+        <TextField label="Password" value={password} onChangeText={setPassword} secureTextEntry textContentType="password" error={error} />
+        <Button loading={loading} onPress={login}>
+          Sign in
+        </Button>
+        <Button variant="tonal" onPress={anonymous}>
+          Continue anonymously
+        </Button>
+      </View>
+      <View style={styles.links}>
+        <Link href="/auth/register">
+          <AppText variant="label" color="brandAction">Create account</AppText>
+        </Link>
+        <Link href="/auth/forgot-password">
+          <AppText variant="label" color="textSecondary">Forgot password</AppText>
+        </Link>
+      </View>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  form: {
+    marginTop: spacing.xl,
+    gap: spacing.xs
+  },
+  links: {
+    marginTop: spacing.lg,
+    flexDirection: "row",
+    justifyContent: "space-between"
+  }
+});

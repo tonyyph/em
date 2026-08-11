@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Ẽm",
+    "slug": "em-cycle-health",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "em",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.em.cyclehealth",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Ẽm uses Face ID to protect your private health data."
+      }
+    },
+    "android": {
+      "package": "com.em.cyclehealth",
+      "permissions": ["POST_NOTIFICATIONS"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-localization",
+      "expo-secure-store",
+      "expo-local-authentication",
+      [
+        "expo-notifications",
+        {
+          "color": "#E95670"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
