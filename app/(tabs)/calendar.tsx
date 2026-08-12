@@ -1,6 +1,6 @@
 import { Link } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { MonthCalendar } from "@/components/calendar/MonthCalendar";
 import { AppHeader } from "@/components/common/AppHeader";
 import { AppText } from "@/components/common/AppText";

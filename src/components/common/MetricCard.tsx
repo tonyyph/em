@@ -1,5 +1,5 @@
 import { StyleSheet, View, type ViewStyle } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "./AppText";
 import type { PhaseName } from "@/design/palettes";
 import { useTheme } from "@/design/theme";

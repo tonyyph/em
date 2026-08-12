@@ -1,7 +1,7 @@
 import { Link } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import * as Haptics from "expo-haptics";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppHeader } from "@/components/common/AppHeader";
 import { AppText } from "@/components/common/AppText";
 import { Chip } from "@/components/common/Chip";

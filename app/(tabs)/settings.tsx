@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Alert, Pressable, Share, StyleSheet, Switch, View } from "react-native";
 import { Link, type Href } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppHeader } from "@/components/common/AppHeader";
 import { AppText } from "@/components/common/AppText";
 import { Button } from "@/components/common/Button";

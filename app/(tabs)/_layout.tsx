@@ -1,6 +1,6 @@
 import type { GestureResponderEvent } from "react-native";
 import { Platform, Pressable, StyleSheet, View, type ColorValue } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/design/theme";

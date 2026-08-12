@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
 import * as Haptics from "expo-haptics";
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "./AppText";
 import type { PhaseName } from "@/design/palettes";
 import { useTheme } from "@/design/theme";

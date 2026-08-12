@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { AppText } from "@/components/common/AppText";
 import { Button } from "@/components/common/Button";

@@ -1,5 +1,5 @@
 import { StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "@/components/common/AppText";
 import { Button } from "@/components/common/Button";
 import { useTheme } from "@/design/theme";
