@@ -134,7 +134,7 @@ export const lightColors: ThemeColors = {
     pregnancy: "#8A5C3B",
     wellness: "#4A6C86"
   },
-  phasePredicted: "#E0B3AF",
+  phasePredicted: "#B86F6A",
   phaseSoft: {
     menstrual: "#FAEAE9",
     follicular: "#E2EFE7",
@@ -197,7 +197,7 @@ export const darkColors: ThemeColors = {
     pregnancy: "#C9946D",
     wellness: "#8FB2CC"
   },
-  phasePredicted: "#7A4E51",
+  phasePredicted: "#A06A6E",
   phaseSoft: {
     menstrual: "#33201F",
     follicular: "#1B2A24",

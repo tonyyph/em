@@ -66,6 +66,22 @@ describe.each([
   it("keeps label text readable on the brand action fill", () => {
     expect(contrast(palette.textOnAction, palette.brandAction)).toBeGreaterThanOrEqual(AA);
   });
+
+  /**
+   * The predicted-period ring is the sole marker distinguishing an estimated
+   * day from an ordinary one, so it is a meaningful graphic under WCAG 1.4.11
+   * and owes 3:1 — not the 1.7:1 a decorative tint would get away with.
+   */
+  it("draws the predicted-period ring at non-text contrast", () => {
+    expect(contrast(palette.phasePredicted, palette.background)).toBeGreaterThanOrEqual(3);
+    expect(contrast(palette.phasePredicted, palette.surface)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("keeps the focus ring visible against every ground", () => {
+    for (const ground of GROUNDS) {
+      expect(contrast(palette.focus, palette[ground] as string)).toBeGreaterThanOrEqual(3);
+    }
+  });
 });
 
 describe("symptom catalog", () => {

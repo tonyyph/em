@@ -95,6 +95,9 @@ const describeDay = (state: DayState, theme: Theme) => {
     return { ground: colors.phaseSoft.ovulation, text: colors.phases.ovulation, dashed: false };
   }
   if (state.predictedPeriod) {
+    // Android ignores `borderStyle: dashed` once a border radius is set, so the
+    // dash is treated as an iOS enhancement and the lighter `phasePredicted`
+    // ring carries the "estimated, not recorded" meaning on both platforms.
     return { ground: "transparent", text: colors.phases.menstrual, dashed: true };
   }
   if (state.fertile) {
@@ -167,9 +170,9 @@ function CalendarDay({
           styles.dayShell,
           {
             backgroundColor: isCurrentMonth ? tone.ground : "transparent",
-            borderColor: tone.dashed && isCurrentMonth ? colors.phases.menstrual : "transparent",
+            borderColor: tone.dashed && isCurrentMonth ? colors.phasePredicted : "transparent",
             borderStyle: tone.dashed ? "dashed" : "solid",
-            borderWidth: tone.dashed && isCurrentMonth ? 1.5 : 0
+            borderWidth: tone.dashed && isCurrentMonth ? 2 : 0
           },
           isSelected
             ? { borderWidth: 2, borderStyle: "solid", borderColor: colors.textPrimary }
@@ -320,7 +323,7 @@ export function MonthCalendar({
 
       <View style={[styles.legend, { borderTopColor: colors.separator }]}>
         <LegendPill label="Period" color={colors.phases.menstrual} />
-        <LegendPill label="Predicted" color={colors.phases.menstrual} dashed />
+        <LegendPill label="Predicted" color={colors.phasePredicted} dashed />
         <LegendPill label="Fertile" color={colors.phaseSoft.fertile} />
         <LegendPill label="Ovulation" color={colors.phases.ovulation} />
         <LegendPill label="Logged" color={colors.phases.wellness} />
