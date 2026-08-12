@@ -1,57 +1,99 @@
-import { Pressable, StyleSheet, type ViewStyle } from "react-native";
+import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
+import * as Haptics from "expo-haptics";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "./AppText";
-import { colors, layout, radius, spacing } from "@/design/tokens";
+import type { PhaseName } from "@/design/palettes";
+import { useTheme } from "@/design/theme";
+import { motion, radius, spacing } from "@/design/tokens";
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type ChipProps = {
   label: string;
   selected?: boolean;
   disabled?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
+  /** Tints the selected state with a phase colour instead of the brand colour. */
+  phase?: PhaseName;
   onPress?: () => void;
   style?: ViewStyle;
 };
 
-export function Chip({ label, selected, disabled, onPress, style }: ChipProps) {
+export function Chip({
+  label,
+  selected = false,
+  disabled = false,
+  icon,
+  phase,
+  onPress,
+  style
+}: ChipProps) {
+  const { colors, reduceMotion } = useTheme();
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
+
+  const accent = phase ? colors.phases[phase] : colors.brandAction;
+  const selectedGround = phase ? colors.phaseSoft[phase] : colors.brandActionSoft;
+
+  const setPressed = (pressed: boolean) => {
+    if (reduceMotion) {
+      return;
+    }
+    scale.value = withSpring(pressed ? 0.96 : 1, motion.spring);
+  };
+
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityState={{ selected, disabled }}
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
+      disabled={disabled || !onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress?.();
+      }}
+      style={[
         styles.root,
-        selected ? styles.selected : undefined,
+        {
+          backgroundColor: selected ? selectedGround : colors.surface,
+          borderColor: selected ? accent : colors.border,
+          borderWidth: selected ? 1.5 : StyleSheet.hairlineWidth
+        },
         disabled ? styles.disabled : undefined,
-        pressed ? styles.pressed : undefined,
+        animatedStyle,
         style
       ]}
     >
-      <AppText variant="label" color={selected ? "surface" : "textPrimary"}>
-        {label}
-      </AppText>
-    </Pressable>
+      <View style={styles.inner}>
+        {icon ? (
+          <Ionicons name={icon} size={15} color={selected ? accent : colors.textSecondary} />
+        ) : null}
+        <AppText variant="label" style={{ color: selected ? accent : colors.textSecondary }}>
+          {label}
+        </AppText>
+      </View>
+    </AnimatedPressable>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
-    minHeight: layout.minTouchTarget,
+    minHeight: 44,
     borderRadius: radius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
-    alignItems: "center",
     justifyContent: "center"
   },
-  selected: {
-    borderColor: colors.brandAction,
-    backgroundColor: colors.brandAction
+  inner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xxs
   },
   disabled: {
     opacity: 0.45
-  },
-  pressed: {
-    transform: [{ scale: 0.98 }]
   }
 });

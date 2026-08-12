@@ -1,7 +1,8 @@
 import { Pressable, StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "./AppText";
-import { colors, layout, radius, spacing } from "@/design/tokens";
+import { useTheme } from "@/design/theme";
+import { layout, radius, spacing } from "@/design/tokens";
 
 type AppHeaderProps = {
   eyebrow?: string;
@@ -12,12 +13,21 @@ type AppHeaderProps = {
   onActionPress?: () => void;
 };
 
-export function AppHeader({ eyebrow, title, subtitle, actionLabel, actionIcon = "information-circle-outline", onActionPress }: AppHeaderProps) {
+export function AppHeader({
+  eyebrow,
+  title,
+  subtitle,
+  actionLabel,
+  actionIcon = "information-circle-outline",
+  onActionPress
+}: AppHeaderProps) {
+  const { colors } = useTheme();
+
   return (
     <View style={styles.root}>
       <View style={styles.copy}>
         {eyebrow ? (
-          <AppText variant="caption" color="textMuted" style={styles.eyebrow}>
+          <AppText variant="eyebrow" color="textMuted" style={styles.eyebrow}>
             {eyebrow}
           </AppText>
         ) : null}
@@ -34,9 +44,16 @@ export function AppHeader({ eyebrow, title, subtitle, actionLabel, actionIcon = 
           accessibilityLabel={actionLabel}
           hitSlop={8}
           onPress={onActionPress}
-          style={({ pressed }) => [styles.action, pressed ? styles.pressed : undefined]}
+          style={({ pressed }) => [
+            styles.action,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              opacity: pressed ? 0.7 : 1
+            }
+          ]}
         >
-          <Ionicons name={actionIcon} size={22} color={colors.textPrimary} />
+          <Ionicons name={actionIcon} size={20} color={colors.textSecondary} />
         </Pressable>
       ) : null}
     </View>
@@ -46,10 +63,10 @@ export function AppHeader({ eyebrow, title, subtitle, actionLabel, actionIcon = 
 const styles = StyleSheet.create({
   root: {
     minHeight: layout.headerHeight,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: spacing.md
   },
@@ -57,21 +74,19 @@ const styles = StyleSheet.create({
     flex: 1
   },
   eyebrow: {
-    marginBottom: spacing.xxs,
-    textTransform: "uppercase"
+    marginBottom: spacing.xs
   },
   subtitle: {
-    marginTop: spacing.xs
+    marginTop: spacing.xs,
+    maxWidth: 340
   },
   action: {
     width: layout.minTouchTarget,
     height: layout.minTouchTarget,
     borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surface
-  },
-  pressed: {
-    opacity: 0.75
+    marginTop: spacing.xs
   }
 });

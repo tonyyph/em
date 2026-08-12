@@ -1,6 +1,7 @@
 import { Link } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppHeader } from "@/components/common/AppHeader";
 import { AppText } from "@/components/common/AppText";
 import { Chip } from "@/components/common/Chip";
@@ -8,92 +9,204 @@ import { InfoBanner } from "@/components/common/InfoBanner";
 import { MetricCard } from "@/components/common/MetricCard";
 import { Screen } from "@/components/common/Screen";
 import { Section } from "@/components/common/Section";
-import { useAppStore } from "@/store/appStore";
+import { asIconName } from "@/components/common/icon";
+import { useTheme } from "@/design/theme";
+import { radius, spacing } from "@/design/tokens";
+import { findSymptom, symptomCatalog } from "@/domain/entities/symptom";
+import type { SymptomType } from "@/domain/entities/symptom";
 import { useOvulation } from "@/hooks/useOvulation";
-import { symptomCatalog } from "@/domain/entities/symptom";
-import { colors, radius, spacing } from "@/design/tokens";
+import { useAppStore } from "@/store/appStore";
 import { dayjs } from "@/utils/date/dayjs";
 
+/** The signals people reach for most often, promoted out of the full catalog. */
+const QUICK_TYPES: SymptomType[] = [
+  "cramps",
+  "fatigue",
+  "headache",
+  "bloating",
+  "happy",
+  "irritable",
+  "sleep",
+  "exercise"
+];
+
 export default function TrackScreen() {
+  const { colors, elevation } = useTheme();
   const selectedDate = useAppStore((state) => state.selectedDate);
   const symptoms = useAppStore((state) => state.symptoms);
+  const upsertSymptom = useAppStore((state) => state.upsertSymptom);
+  const removeSymptom = useAppStore((state) => state.removeSymptom);
   const { prediction } = useOvulation();
-  const recent = symptomCatalog.slice(0, 8);
+
+  const todayLogs = symptoms.filter((symptom) => symptom.date === selectedDate);
+  const loggedTypes = new Set(todayLogs.map((symptom) => symptom.type));
+
+  // One tap writes; a second tap takes it back. Anything logged from here is
+  // recorded as mild, and the full modal is where severity gets refined.
+  const quickToggle = (type: SymptomType) => {
+    Haptics.selectionAsync().catch(() => {});
+    const existing = todayLogs.find((symptom) => symptom.type === type);
+    if (existing) {
+      removeSymptom(existing.id);
+      return;
+    }
+    const entry = findSymptom(type);
+    const now = new Date().toISOString();
+    upsertSymptom({
+      id: `symptom-${selectedDate}-${type}`,
+      date: selectedDate,
+      type,
+      category: entry?.category ?? "physical",
+      severity: "mild",
+      createdAt: now,
+      updatedAt: now
+    });
+  };
 
   return (
     <Screen>
       <AppHeader
         eyebrow="Daily log"
         title="Log gently"
-        subtitle="Frequent actions first, deeper details only when useful."
+        subtitle="One honest signal beats a rushed full form."
       />
 
       <Link href={`/cycle/${selectedDate}`} asChild>
-        <Pressable accessibilityRole="button" style={styles.heroAction}>
-          <View style={styles.heroIcon}>
-            <Ionicons name="pulse-outline" size={24} color={colors.brandAction} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Open the full log for ${dayjs(selectedDate).format("MMMM D")}`}
+          style={({ pressed }) => [
+            styles.hero,
+            elevation.raised,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              opacity: pressed ? 0.9 : 1
+            }
+          ]}
+        >
+          <View style={[styles.heroIcon, { backgroundColor: colors.brandActionSoft }]}>
+            <Ionicons name="pulse-outline" size={22} color={colors.brandAction} />
           </View>
           <View style={styles.heroCopy}>
-            <AppText variant="cardTitle">Open today’s calm log</AppText>
+            <AppText variant="cardTitle">Open today’s full log</AppText>
             <AppText variant="supporting" color="textSecondary" style={styles.heroBody}>
-              Flow, symptom, severity, and notes for {dayjs(selectedDate).format("MMM D")}
+              Period, symptoms, intensity and notes for{" "}
+              {dayjs(selectedDate).format("MMM D")}
             </AppText>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </Pressable>
       </Link>
 
-      <Section title="Fertility context" description="Optional signals can improve your personal pattern over time.">
-        <View style={styles.metrics}>
-          <MetricCard label="Fertile window" value={dayjs(prediction.fertileWindowStart).format("MMM D")} detail={`to ${dayjs(prediction.fertileWindowEnd).format("MMM D")}`} tone="cool" />
-          <MetricCard label="LH / BBT" value="Optional" detail="Not required" />
-        </View>
-      </Section>
-
-      <Section title="Fast signals">
+      <Section
+        title="Quick signals"
+        description="Tap to log, tap again to undo. Saved as mild — refine intensity in the full log."
+      >
         <View style={styles.chipGrid}>
-          {recent.map((symptom) => (
-            <Chip key={symptom.type} label={symptom.label} />
-          ))}
+          {QUICK_TYPES.map((type) => {
+            const entry = findSymptom(type);
+            if (!entry) {
+              return null;
+            }
+            return (
+              <Chip
+                key={type}
+                label={entry.label}
+                icon={asIconName(entry.icon)}
+                selected={loggedTypes.has(type)}
+                onPress={() => quickToggle(type)}
+              />
+            );
+          })}
         </View>
       </Section>
 
-      <Section title="Logged today">
-        {symptoms.filter((symptom) => symptom.date === selectedDate).length > 0 ? (
-          symptoms
-            .filter((symptom) => symptom.date === selectedDate)
-            .map((symptom) => (
-              <View key={symptom.id} style={styles.logRow}>
-                <AppText variant="label">{symptom.type.replace(/_/g, " ")}</AppText>
-                <AppText variant="caption" color="textMuted">
-                  {symptom.severity}
-                </AppText>
-              </View>
-            ))
+      <Section
+        title="Fertility context"
+        description="Shown for orientation only — logging is never required here."
+      >
+        <View style={styles.metrics}>
+          <MetricCard
+            label="Fertile window"
+            value={dayjs(prediction.fertileWindowStart).format("MMM D")}
+            qualifier="estimate"
+            detail={`to ${dayjs(prediction.fertileWindowEnd).format("MMM D")}`}
+            phase="fertile"
+            icon="leaf-outline"
+          />
+          <MetricCard
+            label="LH / BBT"
+            value="Optional"
+            detail="Not required for predictions"
+            icon="flask-outline"
+          />
+        </View>
+      </Section>
+
+      <Section title={`Logged on ${dayjs(selectedDate).format("MMM D")}`}>
+        {todayLogs.length > 0 ? (
+          <View
+            style={[
+              styles.logList,
+              { backgroundColor: colors.surface, borderColor: colors.border }
+            ]}
+          >
+            {todayLogs.map((symptom, index) => {
+              const entry = findSymptom(symptom.type);
+              return (
+                <View
+                  key={symptom.id}
+                  style={[
+                    styles.logRow,
+                    index > 0
+                      ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.separator }
+                      : undefined
+                  ]}
+                >
+                  <Ionicons
+                    name={asIconName(entry?.icon ?? "ellipse-outline")}
+                    size={17}
+                    color={colors.textSecondary}
+                  />
+                  <AppText variant="label" style={styles.logLabel}>
+                    {entry?.label ?? symptom.type.replace(/_/g, " ")}
+                  </AppText>
+                  <AppText variant="caption" color="textMuted">
+                    {symptom.severity}
+                  </AppText>
+                </View>
+              );
+            })}
+          </View>
         ) : (
-          <InfoBanner title="No pressure to complete everything" body="One honest signal is more useful than a rushed full form." />
+          <InfoBanner
+            title="Nothing logged yet today"
+            body="There is no streak to break and no form to complete. Log what is true, when it is true."
+          />
         )}
       </Section>
+
+      <AppText variant="caption" color="textMuted" style={styles.footnote}>
+        {symptomCatalog.length} signals available in the full log.
+      </AppText>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  heroAction: {
+  hero: {
     borderRadius: radius.xl,
-    backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    padding: spacing.lg,
+    padding: spacing.md,
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md
   },
   heroIcon: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     borderRadius: radius.full,
-    backgroundColor: colors.surfaceWarm,
     alignItems: "center",
     justifyContent: "center"
   },
@@ -103,21 +216,31 @@ const styles = StyleSheet.create({
   heroBody: {
     marginTop: spacing.xxs
   },
-  metrics: {
-    flexDirection: "row",
-    gap: spacing.md
-  },
   chipGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.xs
   },
+  metrics: {
+    flexDirection: "row",
+    gap: spacing.sm
+  },
+  logList: {
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.md
+  },
   logRow: {
     minHeight: 52,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.separator,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between"
+    gap: spacing.sm
+  },
+  logLabel: {
+    flex: 1
+  },
+  footnote: {
+    marginTop: spacing.lg,
+    textAlign: "center"
   }
 });

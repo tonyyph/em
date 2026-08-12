@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/feedback/EmptyState";
 import { useOvulation } from "@/hooks/useOvulation";
 import { spacing } from "@/design/tokens";
 import { dayjs } from "@/utils/date/dayjs";
+import { describeCountdown } from "@/utils/format/prediction";
 
 export default function OvulationScreen() {
   const { prediction, ovulationLogs } = useOvulation();
@@ -17,13 +18,37 @@ export default function OvulationScreen() {
     <Screen>
       <AppHeader eyebrow="Fertility detail" title="Fertile window" subtitle="A transparent estimate, not contraception and not diagnosis." />
       <View style={styles.metrics}>
-        <MetricCard label="Window starts" value={dayjs(prediction.fertileWindowStart).format("MMM D")} detail={`ends ${dayjs(prediction.fertileWindowEnd).format("MMM D")}`} tone="cool" />
-        <MetricCard label="Ovulation" value={dayjs(prediction.ovulationDay).format("MMM D")} detail="Estimated" />
+        <MetricCard
+          label="Window starts"
+          value={dayjs(prediction.fertileWindowStart).format("MMM D")}
+          qualifier="estimate"
+          detail={`ends ${dayjs(prediction.fertileWindowEnd).format("MMM D")}`}
+          phase="fertile"
+          icon="leaf-outline"
+        />
+        <MetricCard
+          label="Ovulation"
+          value={dayjs(prediction.ovulationDay).format("MMM D")}
+          qualifier="estimate"
+          detail={describeCountdown(prediction.ovulationDay)}
+          phase="ovulation"
+          icon="sunny-outline"
+        />
       </View>
-      <Section title="Optional signals">
+      <Section
+        title="Optional signals"
+        description="None of these are required. They narrow the estimate when the calendar alone cannot."
+      >
         <View style={styles.chips}>
-          {["BBT", "LH test", "Cervical mucus", "Notes"].map((item) => (
-            <Chip key={item} label={item} />
+          {(
+            [
+              ["BBT", "thermometer-outline"],
+              ["LH test", "flask-outline"],
+              ["Cervical mucus", "water-outline"],
+              ["Notes", "create-outline"]
+            ] as const
+          ).map(([item, icon]) => (
+            <Chip key={item} label={item} icon={icon} />
           ))}
         </View>
       </Section>

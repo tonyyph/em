@@ -1,32 +1,41 @@
 import type { PropsWithChildren } from "react";
 import { Text, type TextProps, type TextStyle } from "react-native";
-import { colors, typography } from "@/design/tokens";
+import type { ThemeColors } from "@/design/palettes";
+import { maxFontSizeMultiplier, useTheme } from "@/design/theme";
+import { typography, type TextVariant } from "@/design/tokens";
 
-export type TextVariant =
-  | "display"
-  | "heroMetric"
-  | "pageTitle"
-  | "sectionTitle"
-  | "cardTitle"
-  | "body"
-  | "supporting"
-  | "label"
-  | "caption"
-  | "numeric";
+export type { TextVariant };
+
+/** Only the theme keys that actually hold a colour string. */
+export type TextColor = {
+  [K in keyof ThemeColors]: ThemeColors[K] extends string ? K : never;
+}[keyof ThemeColors];
 
 type AppTextProps = PropsWithChildren<
   TextProps & {
     variant?: TextVariant;
-    color?: keyof typeof colors;
+    color?: TextColor;
+    /** Tint from the phase palette instead of a semantic colour. */
+    phase?: keyof ThemeColors["phases"];
   }
 >;
 
-export function AppText({ children, variant = "body", color = "textPrimary", style, ...props }: AppTextProps) {
+export function AppText({
+  children,
+  variant = "body",
+  color = "textPrimary",
+  phase,
+  style,
+  ...props
+}: AppTextProps) {
+  const { colors } = useTheme();
+  const tint = phase ? colors.phases[phase] : colors[color];
+
   return (
     <Text
       allowFontScaling
-      maxFontSizeMultiplier={1.35}
-      style={[typography[variant] as TextStyle, { color: colors[color] as string }, style]}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
+      style={[typography[variant] as TextStyle, { color: tint }, style]}
       {...props}
     >
       {children}

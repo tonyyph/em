@@ -8,9 +8,11 @@ import { InfoBanner } from "@/components/common/InfoBanner";
 import { Screen } from "@/components/common/Screen";
 import { TextField } from "@/components/forms/TextField";
 import { authService } from "@/services/firebase/authService";
-import { spacing } from "@/design/tokens";
+import { useTheme } from "@/design/theme";
+import { radius, spacing } from "@/design/tokens";
 
 export default function LoginScreen() {
+  const { colors } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string>();
@@ -41,7 +43,15 @@ export default function LoginScreen() {
 
   return (
     <Screen>
-      <AppHeader eyebrow="Private account" title="Welcome back" subtitle="Sync when Firebase is configured, or stay local with anonymous mode." />
+      <View style={styles.brandMark}>
+        <View style={[styles.brandStem, { backgroundColor: colors.brandAction }]} />
+        <AppText variant="label">Ẽm</AppText>
+      </View>
+      <AppHeader
+        eyebrow="Private account"
+        title="Welcome back"
+        subtitle="Sign in to sync, or stay entirely local with anonymous mode."
+      />
       {!authService.isConfigured() ? (
         <InfoBanner title="Cloud sync is not configured" body="The app still runs in local anonymous mode. Fill .env to enable email auth." tone="warning" />
       ) : null}
@@ -68,6 +78,18 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  brandMark: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    marginTop: spacing.md
+  },
+  brandStem: {
+    width: 14,
+    height: 32,
+    borderRadius: radius.full,
+    transform: [{ rotate: "18deg" }]
+  },
   form: {
     marginTop: spacing.xl,
     gap: spacing.xs

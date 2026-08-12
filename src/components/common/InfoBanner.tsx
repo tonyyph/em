@@ -1,24 +1,18 @@
 import { StyleSheet, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "./AppText";
-import { colors, radius, spacing } from "@/design/tokens";
+import { useTheme } from "@/design/theme";
+import { radius, spacing } from "@/design/tokens";
 
-type InfoBannerTone = "neutral" | "warning" | "error" | "success";
+export type BannerTone = "neutral" | "warning" | "error" | "success";
 
 type InfoBannerProps = {
   title: string;
   body?: string;
-  tone?: InfoBannerTone;
+  tone?: BannerTone;
 };
 
-const toneColor: Record<InfoBannerTone, string> = {
-  neutral: colors.surfaceCool,
-  warning: "#F6E5C5",
-  error: "#F5D9D7",
-  success: "#DCEDE4"
-};
-
-const toneIcon: Record<InfoBannerTone, keyof typeof Ionicons.glyphMap> = {
+const iconFor: Record<BannerTone, keyof typeof Ionicons.glyphMap> = {
   neutral: "shield-checkmark-outline",
   warning: "alert-circle-outline",
   error: "warning-outline",
@@ -26,11 +20,27 @@ const toneIcon: Record<InfoBannerTone, keyof typeof Ionicons.glyphMap> = {
 };
 
 export function InfoBanner({ title, body, tone = "neutral" }: InfoBannerProps) {
+  const { colors } = useTheme();
+
+  const ground = {
+    neutral: colors.bannerNeutral,
+    warning: colors.bannerWarning,
+    error: colors.bannerError,
+    success: colors.bannerSuccess
+  }[tone];
+
+  const accent = {
+    neutral: colors.focus,
+    warning: colors.warning,
+    error: colors.error,
+    success: colors.success
+  }[tone];
+
   return (
-    <View style={[styles.root, { backgroundColor: toneColor[tone] }]}>
-      <Ionicons name={toneIcon[tone]} size={20} color={colors.textPrimary} />
+    <View style={[styles.root, { backgroundColor: ground }]}>
+      <Ionicons name={iconFor[tone]} size={19} color={accent} style={styles.icon} />
       <View style={styles.copy}>
-        <AppText variant="cardTitle">{title}</AppText>
+        <AppText variant="label">{title}</AppText>
         {body ? (
           <AppText variant="supporting" color="textSecondary" style={styles.body}>
             {body}
@@ -47,7 +57,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     flexDirection: "row",
     gap: spacing.sm,
-    alignItems: "flex-start"
+    marginTop: spacing.sm
+  },
+  icon: {
+    marginTop: 1
   },
   copy: {
     flex: 1

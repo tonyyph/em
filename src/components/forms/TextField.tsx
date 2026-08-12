@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { StyleSheet, TextInput, View, type TextInputProps } from "react-native";
 import { AppText } from "@/components/common/AppText";
-import { colors, layout, radius, spacing, typography } from "@/design/tokens";
+import { maxFontSizeMultiplier, useTheme } from "@/design/theme";
+import { radius, spacing, typography } from "@/design/tokens";
 
 type TextFieldProps = TextInputProps & {
   label: string;
@@ -9,20 +11,48 @@ type TextFieldProps = TextInputProps & {
 };
 
 export function TextField({ label, error, helper, style, ...props }: TextFieldProps) {
+  const { colors } = useTheme();
+  const [focused, setFocused] = useState(false);
+
+  const borderColor = error ? colors.error : focused ? colors.focus : colors.border;
+
   return (
     <View style={styles.root}>
       <AppText variant="label" color="textSecondary" style={styles.label}>
         {label}
       </AppText>
       <TextInput
-        accessibilityLabel={label}
-        accessibilityHint={helper}
+        allowFontScaling
+        maxFontSizeMultiplier={maxFontSizeMultiplier}
         placeholderTextColor={colors.textMuted}
-        style={[styles.input, error ? styles.inputError : undefined, style]}
+        accessibilityHint={helper}
+        onFocus={(event) => {
+          setFocused(true);
+          props.onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          setFocused(false);
+          props.onBlur?.(event);
+        }}
+        style={[
+          styles.input,
+          typography.body,
+          {
+            color: colors.textPrimary,
+            backgroundColor: colors.surface,
+            borderColor,
+            borderWidth: focused || error ? 1.5 : StyleSheet.hairlineWidth
+          },
+          style
+        ]}
         {...props}
       />
       {error || helper ? (
-        <AppText variant="caption" color={error ? "error" : "textMuted"} style={styles.message}>
+        <AppText
+          variant="caption"
+          color={error ? "error" : "textMuted"}
+          style={styles.helper}
+        >
           {error ?? helper}
         </AppText>
       ) : null}
@@ -32,26 +62,18 @@ export function TextField({ label, error, helper, style, ...props }: TextFieldPr
 
 const styles = StyleSheet.create({
   root: {
-    marginBottom: spacing.md
+    marginTop: spacing.md
   },
   label: {
     marginBottom: spacing.xs
   },
   input: {
-    minHeight: layout.minTouchTarget,
+    minHeight: 52,
     borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    color: colors.textPrimary,
-    ...typography.body
+    paddingVertical: spacing.sm
   },
-  inputError: {
-    borderColor: colors.error
-  },
-  message: {
-    marginTop: spacing.xs
+  helper: {
+    marginTop: spacing.xxs
   }
 });

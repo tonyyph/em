@@ -1,10 +1,25 @@
+import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
-import Svg, { Circle, G, Line, Path, Text as SvgText } from "react-native-svg";
-import type { Cycle, CyclePrediction } from "@/domain/entities/cycle";
+import Animated, {
+  useAnimatedProps,
+  useSharedValue,
+  withTiming,
+  Easing
+} from "react-native-reanimated";
+import Svg, { Circle, G, Line, Path } from "react-native-svg";
 import { AppText } from "@/components/common/AppText";
 import { getCurrentPhase } from "@/design/phase";
-import { colors, phaseMeta, radius, spacing } from "@/design/tokens";
+import { useTheme } from "@/design/theme";
+import { motion, phaseMeta, radius, spacing } from "@/design/tokens";
+import type { Cycle, CyclePrediction } from "@/domain/entities/cycle";
 import { dayjs } from "@/utils/date/dayjs";
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+const SIZE = 232;
+const CENTER = SIZE / 2;
+const RING_R = 86;
+const RING_W = 13;
 
 type CycleAtlasProps = {
   date: string;
@@ -13,65 +28,180 @@ type CycleAtlasProps = {
   cycleDay?: number;
 };
 
-const polar = (cx: number, cy: number, r: number, angle: number) => {
+const polar = (r: number, angle: number) => {
   const radians = ((angle - 90) * Math.PI) / 180;
-  return { x: cx + r * Math.cos(radians), y: cy + r * Math.sin(radians) };
+  return { x: CENTER + r * Math.cos(radians), y: CENTER + r * Math.sin(radians) };
 };
 
-const arcPath = (cx: number, cy: number, r: number, start: number, end: number) => {
-  const startPoint = polar(cx, cy, r, end);
-  const endPoint = polar(cx, cy, r, start);
-  const largeArcFlag = end - start <= 180 ? "0" : "1";
-  return `M ${startPoint.x} ${startPoint.y} A ${r} ${r} 0 ${largeArcFlag} 0 ${endPoint.x} ${endPoint.y}`;
+const arcPath = (r: number, start: number, end: number) => {
+  // A full circle cannot be expressed as a single arc — the start and end
+  // points coincide and the renderer draws nothing.
+  const sweep = Math.min(end - start, 359.9);
+  const from = polar(r, start);
+  const to = polar(r, start + sweep);
+  return `M ${from.x} ${from.y} A ${r} ${r} 0 ${sweep > 180 ? 1 : 0} 1 ${to.x} ${to.y}`;
 };
 
+/**
+ * The cycle as a dial.
+ *
+ * Arc spans are derived from the prediction rather than fixed: a 24-day cycle
+ * and a 34-day cycle genuinely look different here, which matters because the
+ * ring is the first thing that tells someone whether the app understands them.
+ * Geometry follows the algorithm — ovulation lands 14 days before the next
+ * period, the fertile window spans the five days before it plus one after.
+ */
 export function CycleAtlas({ date, cycles, prediction, cycleDay }: CycleAtlasProps) {
+  const { colors, elevation, reduceMotion } = useTheme();
+
   const phase = getCurrentPhase(date, cycles, prediction, prediction.averagePeriodLength);
-  const currentPhase = phaseMeta[phase];
-  const safeCycleDay = cycleDay ?? Math.max(1, dayjs(date).diff(dayjs(cycles.at(-1)?.startDate ?? date), "day") + 1);
-  const progressAngle = Math.min(355, Math.max(4, (safeCycleDay / prediction.averageCycleLength) * 360));
-  const marker = polar(104, 104, 76, progressAngle);
-  const fertileStart = Math.max(0, prediction.averageCycleLength - 19);
-  const fertileEnd = Math.min(prediction.averageCycleLength, prediction.averageCycleLength - 13);
-  const fertileStartAngle = (fertileStart / prediction.averageCycleLength) * 360;
-  const fertileEndAngle = (fertileEnd / prediction.averageCycleLength) * 360;
+  const meta = phaseMeta[phase];
+
+  const cycleLength = Math.max(prediction.averageCycleLength, 14);
+  const periodLength = Math.min(prediction.averagePeriodLength, cycleLength - 4);
+
+  const lastStart = cycles.at(-1)?.startDate ?? date;
+  const safeCycleDay = Math.min(
+    cycleLength,
+    Math.max(1, cycleDay ?? dayjs(date).diff(dayjs(lastStart), "day") + 1)
+  );
+
+  const toAngle = (day: number) => (Math.min(Math.max(day, 0), cycleLength) / cycleLength) * 360;
+
+  const ovulationDay = cycleLength - 13;
+  const bounds = {
+    menstrualEnd: toAngle(periodLength),
+    fertileStart: toAngle(Math.max(ovulationDay - 5, periodLength)),
+    fertileEnd: toAngle(ovulationDay + 1),
+    ovulation: toAngle(ovulationDay - 0.5)
+  };
+
+  const segments = [
+    { key: "menstrual" as const, from: 0, to: bounds.menstrualEnd },
+    { key: "follicular" as const, from: bounds.menstrualEnd, to: bounds.fertileStart },
+    { key: "fertile" as const, from: bounds.fertileStart, to: bounds.fertileEnd },
+    { key: "luteal" as const, from: bounds.fertileEnd, to: 360 }
+  ].filter((segment) => segment.to - segment.from > 0.6);
+
+  const progressAngle = toAngle(safeCycleDay - 0.5);
+  const marker = polar(RING_R, progressAngle);
+
+  // The marker travels from the top of the dial to today's position, so the
+  // ring reads as a clock face being wound rather than as a static chart.
+  const travel = useSharedValue(reduceMotion ? 1 : 0);
+
+  useEffect(() => {
+    travel.value = reduceMotion
+      ? 1
+      : withTiming(1, {
+          duration: motion.duration.deliberate,
+          easing: Easing.out(Easing.cubic)
+        });
+  }, [travel, reduceMotion, progressAngle]);
+
+  const markerProps = useAnimatedProps(() => {
+    const angle = progressAngle * travel.value;
+    const radians = ((angle - 90) * Math.PI) / 180;
+    return {
+      cx: CENTER + RING_R * Math.cos(radians),
+      cy: CENTER + RING_R * Math.sin(radians)
+    };
+  }, [progressAngle]);
+
+  const ovulationMark = polar(RING_R, bounds.ovulation);
 
   return (
-    <View style={styles.root}>
+    <View
+      style={[
+        styles.root,
+        elevation.raised,
+        { backgroundColor: colors.surface, borderColor: colors.border }
+      ]}
+      accessibilityRole="image"
+      accessibilityLabel={`Day ${safeCycleDay} of an estimated ${cycleLength} day cycle. Current phase: ${meta.label}.`}
+    >
       <View style={styles.visual}>
-        <Svg width="208" height="208" viewBox="0 0 208 208" accessibilityLabel="Cycle atlas visualization">
-          <Circle cx="104" cy="104" r="86" fill="#FFFDF9" stroke={colors.border} strokeWidth="1" />
-          <Path d={arcPath(104, 104, 76, 0, 65)} stroke={colors.phases.menstrual} strokeWidth="14" strokeLinecap="round" fill="none" />
-          <Path d={arcPath(104, 104, 76, 65, fertileStartAngle)} stroke={colors.phases.follicular} strokeWidth="14" strokeLinecap="round" fill="none" />
-          <Path d={arcPath(104, 104, 76, fertileStartAngle, fertileEndAngle)} stroke={colors.phases.fertile} strokeWidth="14" strokeLinecap="round" fill="none" />
-          <Path d={arcPath(104, 104, 76, fertileEndAngle, 360)} stroke={colors.phases.luteal} strokeWidth="14" strokeLinecap="round" fill="none" />
-          <G opacity="0.7">
-            {Array.from({ length: 12 }, (_, index) => {
-              const angle = (index / 12) * 360;
-              const a = polar(104, 104, 58, angle);
-              const b = polar(104, 104, 64, angle);
-              return <Line key={angle} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={colors.separator} strokeWidth="1" />;
+        <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
+          <Circle
+            cx={CENTER}
+            cy={CENTER}
+            r={RING_R}
+            stroke={colors.backgroundSunken}
+            strokeWidth={RING_W}
+            fill="none"
+          />
+
+          {segments.map((segment) => (
+            <Path
+              key={segment.key}
+              d={arcPath(RING_R, segment.from, segment.to)}
+              stroke={colors.phases[segment.key]}
+              strokeWidth={RING_W}
+              strokeLinecap="butt"
+              fill="none"
+              opacity={phase === segment.key ? 1 : 0.42}
+            />
+          ))}
+
+          <G opacity={0.45}>
+            {Array.from({ length: cycleLength }, (_, index) => {
+              if (index % 7 !== 0) {
+                return null;
+              }
+              const angle = toAngle(index);
+              const a = polar(RING_R - RING_W / 2 - 5, angle);
+              const b = polar(RING_R - RING_W / 2 - 10, angle);
+              return (
+                <Line
+                  key={angle}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke={colors.textMuted}
+                  strokeWidth={1}
+                />
+              );
             })}
           </G>
-          <Circle cx={marker.x} cy={marker.y} r="8" fill={currentPhase.color} stroke="#FFFDF9" strokeWidth="4" />
-          <Circle cx="104" cy="104" r="44" fill={colors.backgroundMuted} />
-          <SvgText x="104" y="100" textAnchor="middle" fontSize="13" fontWeight="700" fill={colors.textMuted}>
-            Day
-          </SvgText>
-          <SvgText x="104" y="130" textAnchor="middle" fontSize="34" fontWeight="700" fill={colors.textPrimary}>
-            {safeCycleDay}
-          </SvgText>
+
+          <Circle
+            cx={ovulationMark.x}
+            cy={ovulationMark.y}
+            r={3}
+            fill={colors.surface}
+            opacity={0.9}
+          />
+
+          <AnimatedCircle
+            animatedProps={markerProps}
+            r={9}
+            fill={colors.phases[phase] ?? colors.brandAction}
+            stroke={colors.surface}
+            strokeWidth={4}
+          />
         </Svg>
+
+        <View style={styles.core} pointerEvents="none">
+          <AppText variant="eyebrow" color="textMuted">
+            Day
+          </AppText>
+          <AppText variant="heroMetric" style={styles.dayNumber}>
+            {safeCycleDay}
+          </AppText>
+          <AppText variant="caption" color="textMuted">
+            of ~{cycleLength}
+          </AppText>
+        </View>
       </View>
+
       <View style={styles.copy}>
-        <AppText variant="caption" color="textMuted">
-          Current signal
-        </AppText>
-        <AppText variant="sectionTitle" style={styles.phase}>
-          {currentPhase.label}
-        </AppText>
-        <AppText variant="supporting" color="textSecondary">
-          {currentPhase.description}
+        <View style={styles.phaseRow}>
+          <View style={[styles.swatch, { backgroundColor: colors.phases[phase] }]} />
+          <AppText variant="sectionTitle">{meta.label}</AppText>
+        </View>
+        <AppText variant="supporting" color="textSecondary" style={styles.description}>
+          {meta.description}
         </AppText>
       </View>
     </View>
@@ -81,21 +211,41 @@ export function CycleAtlas({ date, cycles, prediction, cycleDay }: CycleAtlasPro
 const styles = StyleSheet.create({
   root: {
     borderRadius: radius.xl,
-    backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
     padding: spacing.lg,
     overflow: "hidden"
   },
   visual: {
     alignItems: "center",
-    marginTop: spacing.xs
+    justifyContent: "center"
+  },
+  core: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  dayNumber: {
+    marginTop: -2,
+    marginBottom: -4
   },
   copy: {
-    marginTop: spacing.md
+    marginTop: spacing.lg
   },
-  phase: {
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs
+  phaseRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs
+  },
+  swatch: {
+    width: 8,
+    height: 8,
+    borderRadius: radius.full
+  },
+  description: {
+    marginTop: spacing.xxs
   }
 });

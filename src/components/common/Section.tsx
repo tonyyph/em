@@ -1,7 +1,7 @@
 import type { PropsWithChildren, ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { AppText } from "./AppText";
-import { colors, spacing } from "@/design/tokens";
+import { spacing } from "@/design/tokens";
 
 type SectionProps = PropsWithChildren<{
   title: string;
@@ -14,21 +14,21 @@ export function Section({ title, eyebrow, description, action, children }: Secti
   return (
     <View style={styles.root}>
       <View style={styles.header}>
-        <View style={styles.headerText}>
+        <View style={styles.copy}>
           {eyebrow ? (
-            <AppText variant="caption" color="textMuted" style={styles.eyebrow}>
+            <AppText variant="eyebrow" color="textMuted" style={styles.eyebrow}>
               {eyebrow}
             </AppText>
           ) : null}
           <AppText variant="sectionTitle">{title}</AppText>
-          {description ? (
-            <AppText variant="supporting" color="textSecondary" style={styles.description}>
-              {description}
-            </AppText>
-          ) : null}
         </View>
         {action}
       </View>
+      {description ? (
+        <AppText variant="supporting" color="textSecondary" style={styles.description}>
+          {description}
+        </AppText>
+      ) : null}
       {children}
     </View>
   );
@@ -36,23 +36,22 @@ export function Section({ title, eyebrow, description, action, children }: Secti
 
 const styles = StyleSheet.create({
   root: {
-    marginTop: spacing.xl
+    marginTop: spacing.xxl
   },
   header: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     justifyContent: "space-between",
-    gap: spacing.md,
-    marginBottom: spacing.sm
+    gap: spacing.sm
   },
-  headerText: {
+  copy: {
     flex: 1
   },
   eyebrow: {
-    color: colors.textMuted,
-    textTransform: "uppercase"
+    marginBottom: spacing.xxs
   },
   description: {
-    marginTop: spacing.xs
+    marginTop: spacing.xxs,
+    marginBottom: spacing.sm
   }
 });

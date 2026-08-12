@@ -1,77 +1,117 @@
 import { useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, Switch, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import * as Haptics from "expo-haptics";
 import { AppHeader } from "@/components/common/AppHeader";
 import { AppText } from "@/components/common/AppText";
 import { Button } from "@/components/common/Button";
 import { Chip } from "@/components/common/Chip";
 import { InfoBanner } from "@/components/common/InfoBanner";
-import { SegmentedControl } from "@/components/common/SegmentedControl";
 import { Screen } from "@/components/common/Screen";
 import { Section } from "@/components/common/Section";
+import { SegmentedControl } from "@/components/common/SegmentedControl";
 import { TextField } from "@/components/forms/TextField";
+import { asIconName } from "@/components/common/icon";
+import { useTheme } from "@/design/theme";
+import { radius, spacing } from "@/design/tokens";
 import type { FlowIntensity } from "@/domain/entities/cycle";
-import type { SymptomCategory, SymptomSeverity } from "@/domain/entities/symptom";
-import { symptomCatalog } from "@/domain/entities/symptom";
+import type { SymptomCategory, SymptomSeverity, SymptomType } from "@/domain/entities/symptom";
+import { symptomsByCategory } from "@/domain/entities/symptom";
 import { useAppStore } from "@/store/appStore";
-import { colors, radius, spacing } from "@/design/tokens";
+import { flowOn, isPeriodDay } from "@/utils/algorithms/periodLog";
 import { dayjs } from "@/utils/date/dayjs";
 
-const flows: { label: string; value: FlowIntensity; detail: string }[] = [
-  { label: "Spotting", value: "spotting", detail: "Trace" },
-  { label: "Light", value: "light", detail: "Manageable" },
-  { label: "Medium", value: "medium", detail: "Typical" },
-  { label: "Heavy", value: "heavy", detail: "Noticeable" }
+const FLOWS: { label: string; value: FlowIntensity }[] = [
+  { label: "Spotting", value: "spotting" },
+  { label: "Light", value: "light" },
+  { label: "Medium", value: "medium" },
+  { label: "Heavy", value: "heavy" }
 ];
-const severities: { label: string; value: SymptomSeverity }[] = [
+
+const SEVERITIES: { label: string; value: SymptomSeverity }[] = [
   { label: "Mild", value: "mild" },
   { label: "Moderate", value: "moderate" },
   { label: "Severe", value: "severe" }
 ];
-const categories: { label: string; value: SymptomCategory }[] = [
+
+// The `pregnancy` category has no catalog entries — pregnancy tracking lives on
+// its own screen — so offering it here would open an empty tab.
+const CATEGORIES: { label: string; value: SymptomCategory }[] = [
   { label: "Body", value: "physical" },
   { label: "Mood", value: "mental" },
-  { label: "Habits", value: "behavior" },
-  { label: "Pregnancy", value: "pregnancy" }
+  { label: "Habits", value: "behavior" }
 ];
 
 export default function CycleDetailScreen() {
   const { date } = useLocalSearchParams<{ date: string }>();
-  const upsertCycle = useAppStore((state) => state.upsertCycle);
+  const { colors } = useTheme();
+
+  const cycles = useAppStore((state) => state.cycles);
+  const symptoms = useAppStore((state) => state.symptoms);
+  const setPeriodDay = useAppStore((state) => state.setPeriodDay);
   const upsertSymptom = useAppStore((state) => state.upsertSymptom);
-  const [flow, setFlow] = useState<FlowIntensity>("medium");
-  const [severity, setSeverity] = useState<SymptomSeverity>("mild");
-  const [category, setCategory] = useState<SymptomCategory>("physical");
-  const [selectedSymptomType, setSelectedSymptomType] = useState(symptomCatalog[0].type);
-  const [notes, setNotes] = useState("");
-  const [saved, setSaved] = useState(false);
-  const selectedSymptom = symptomCatalog.find((symptom) => symptom.type === selectedSymptomType) ?? symptomCatalog[0];
-  const filteredSymptoms = useMemo(
-    () => symptomCatalog.filter((symptom) => symptom.category === category),
-    [category]
+  const removeSymptom = useAppStore((state) => state.removeSymptom);
+
+  const existing = useMemo(
+    () => symptoms.filter((symptom) => symptom.date === date),
+    [symptoms, date]
   );
+
+  const [bleeding, setBleeding] = useState(() => isPeriodDay(cycles, date));
+  const [flow, setFlow] = useState<FlowIntensity>(() => flowOn(cycles, date) ?? "medium");
+  const [category, setCategory] = useState<SymptomCategory>("physical");
+  const [selected, setSelected] = useState<Set<SymptomType>>(
+    () => new Set(existing.map((symptom) => symptom.type))
+  );
+  const [severity, setSeverity] = useState<SymptomSeverity>(
+    () => existing[0]?.severity ?? "mild"
+  );
+  const [notes, setNotes] = useState(() => existing.find((s) => s.notes)?.notes ?? "");
+  const [saved, setSaved] = useState(false);
+
+  const visible = useMemo(() => symptomsByCategory(category), [category]);
+
+  const toggle = (type: SymptomType) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  };
 
   const save = () => {
     const now = new Date().toISOString();
-    upsertCycle({
-      id: `local-cycle-${date}`,
-      startDate: date,
-      endDate: date,
-      flow,
-      notes,
-      createdAt: now,
-      updatedAt: now
-    });
-    upsertSymptom({
-      id: `local-symptom-${date}-${selectedSymptom.type}`,
-      date,
-      type: selectedSymptom.type,
-      category: selectedSymptom.category,
-      severity,
-      notes,
-      createdAt: now,
-      updatedAt: now
-    });
+
+    setPeriodDay(date, bleeding ? flow : undefined);
+
+    // Reconcile rather than append: anything deselected since opening the
+    // screen is removed, so the log reflects the final state of the form.
+    for (const symptom of existing) {
+      if (!selected.has(symptom.type)) {
+        removeSymptom(symptom.id);
+      }
+    }
+
+    for (const type of selected) {
+      const entry = visible.find((item) => item.type === type);
+      const previous = existing.find((symptom) => symptom.type === type);
+      upsertSymptom({
+        id: previous?.id ?? `symptom-${date}-${type}`,
+        date,
+        type,
+        category: entry?.category ?? previous?.category ?? "physical",
+        severity,
+        notes: notes || undefined,
+        createdAt: previous?.createdAt ?? now,
+        updatedAt: now
+      });
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     setSaved(true);
     setTimeout(() => router.back(), 420);
   };
@@ -80,56 +120,97 @@ export default function CycleDetailScreen() {
     <Screen>
       <AppHeader
         eyebrow="Daily entry"
-        title={dayjs(date).format("MMM D")}
-        subtitle="A compact log that respects your time and preserves context."
+        title={dayjs(date).format("dddd, MMM D")}
+        subtitle="Log only what is true today. A short entry is more useful than a complete one."
         actionLabel="Close log"
         actionIcon="close"
         onActionPress={() => router.back()}
       />
 
-      {saved ? <InfoBanner title="Saved" body="Your log has been added to the local cycle history." tone="success" /> : null}
+      {saved ? (
+        <InfoBanner
+          title="Saved"
+          body="Added to your local history."
+          tone="success"
+        />
+      ) : null}
 
-      <Section title="Flow" description="Choose the closest match. You can edit later.">
-        <View style={styles.flowGrid}>
-          {flows.map((item) => {
-            const selected = flow === item.value;
-            return (
-              <Button key={item.value} variant={selected ? "primary" : "secondary"} onPress={() => setFlow(item.value)} style={styles.flowButton}>
-                {item.label}
-              </Button>
-            );
-          })}
+      <Section
+        title="Period"
+        description="Only turn this on for days you actually bled — it is what every prediction is built from."
+      >
+        <View
+          style={[
+            styles.switchRow,
+            { backgroundColor: colors.surface, borderColor: colors.border }
+          ]}
+        >
+          <View style={styles.switchCopy}>
+            <AppText variant="cardTitle">Bleeding today</AppText>
+            <AppText variant="caption" color="textMuted">
+              {bleeding ? "Counted as a period day" : "Not a period day"}
+            </AppText>
+          </View>
+          <Switch
+            value={bleeding}
+            onValueChange={(next) => {
+              Haptics.selectionAsync().catch(() => {});
+              setBleeding(next);
+            }}
+            trackColor={{ true: colors.brandAction, false: colors.backgroundSunken }}
+            thumbColor={colors.surface}
+          />
         </View>
+
+        {bleeding ? (
+          <View style={styles.flowGrid}>
+            {FLOWS.map((item) => (
+              <Chip
+                key={item.value}
+                label={item.label}
+                phase="menstrual"
+                selected={flow === item.value}
+                onPress={() => setFlow(item.value)}
+                style={styles.flowChip}
+              />
+            ))}
+          </View>
+        ) : null}
       </Section>
 
-      <Section title="Symptoms" description="Progressive groups prevent an endless wall of chips.">
-        <SegmentedControl value={category} options={categories} onChange={setCategory} />
+      <Section title="Symptoms" description="Pick as many as apply.">
+        <SegmentedControl value={category} options={CATEGORIES} onChange={setCategory} />
         <View style={styles.symptomGrid}>
-          {filteredSymptoms.map((symptom) => (
+          {visible.map((symptom) => (
             <Chip
               key={symptom.type}
               label={symptom.label}
-              selected={selectedSymptom.type === symptom.type}
-              onPress={() => setSelectedSymptomType(symptom.type)}
-              style={styles.symptomChip}
+              icon={asIconName(symptom.icon)}
+              selected={selected.has(symptom.type)}
+              onPress={() => toggle(symptom.type)}
             />
           ))}
         </View>
       </Section>
 
-      <Section title="Intensity">
-        <View style={styles.severityRow}>
-          {severities.map((item) => (
-            <Chip
-              key={item.value}
-              label={item.label}
-              selected={severity === item.value}
-              onPress={() => setSeverity(item.value)}
-              style={styles.severityChip}
-            />
-          ))}
-        </View>
-      </Section>
+      {selected.size > 0 ? (
+        <Section
+          title="Intensity"
+          description={`Applied to all ${selected.size} selected signal${selected.size > 1 ? "s" : ""}.`}
+        >
+          <View style={styles.severityRow}>
+            {SEVERITIES.map((item) => (
+              <Chip
+                key={item.value}
+                label={item.label}
+                selected={severity === item.value}
+                onPress={() => setSeverity(item.value)}
+                style={styles.severityChip}
+              />
+            ))}
+          </View>
+        </Section>
+      ) : null}
 
       <Section title="Private note">
         <TextField
@@ -137,15 +218,18 @@ export default function CycleDetailScreen() {
           value={notes}
           onChangeText={setNotes}
           multiline
-          helper="Avoid storing emergency or diagnostic details here. Bring urgent symptoms to a clinician."
+          placeholder="Anything worth remembering about today"
+          helper="Bring urgent symptoms to a clinician rather than storing them here."
           style={styles.notes}
         />
       </Section>
 
       <View style={styles.footer}>
-        <Button onPress={save}>Save daily log</Button>
+        <Button onPress={save} icon="checkmark">
+          Save daily log
+        </Button>
         <AppText variant="caption" color="textMuted" style={styles.footerNote}>
-          Data is local in anonymous mode. Cloud sync requires Firebase configuration.
+          Stored on this device. Cloud sync requires Firebase configuration.
         </AppText>
       </View>
     </Screen>
@@ -153,22 +237,33 @@ export default function CycleDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    minHeight: 64,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm
+  },
+  switchCopy: {
+    flex: 1
+  },
   flowGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: spacing.sm
+    gap: spacing.xs,
+    marginTop: spacing.sm
   },
-  flowButton: {
-    width: "47%"
+  flowChip: {
+    flexGrow: 1
   },
   symptomGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.xs,
     marginTop: spacing.md
-  },
-  symptomChip: {
-    marginBottom: spacing.xs
   },
   severityRow: {
     flexDirection: "row",
@@ -179,12 +274,10 @@ const styles = StyleSheet.create({
   },
   notes: {
     minHeight: 108,
-    textAlignVertical: "top",
-    borderColor: colors.border,
-    borderRadius: radius.lg
+    textAlignVertical: "top"
   },
   footer: {
-    marginTop: spacing.xl,
+    marginTop: spacing.xxl,
     gap: spacing.sm
   },
   footerNote: {
