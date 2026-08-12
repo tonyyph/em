@@ -9,6 +9,7 @@ import { InfoBanner } from "@/components/common/InfoBanner";
 import { MetricCard } from "@/components/common/MetricCard";
 import { Screen } from "@/components/common/Screen";
 import { Section } from "@/components/common/Section";
+import { asIconName } from "@/components/common/icon";
 import { useTheme } from "@/design/theme";
 import { radius, spacing } from "@/design/tokens";
 import { findSymptom, symptomCatalog } from "@/domain/entities/symptom";
@@ -112,7 +113,7 @@ export default function TrackScreen() {
               <Chip
                 key={type}
                 label={entry.label}
-                icon={entry.icon as never}
+                icon={asIconName(entry.icon)}
                 selected={loggedTypes.has(type)}
                 onPress={() => quickToggle(type)}
               />
@@ -164,7 +165,7 @@ export default function TrackScreen() {
                   ]}
                 >
                   <Ionicons
-                    name={(entry?.icon ?? "ellipse-outline") as never}
+                    name={asIconName(entry?.icon ?? "ellipse-outline")}
                     size={17}
                     color={colors.textSecondary}
                   />

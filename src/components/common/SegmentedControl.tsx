@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LayoutAnimation, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import Animated, {
   useAnimatedStyle,
@@ -75,7 +75,6 @@ export function SegmentedControl<T extends string>({
                 return;
               }
               Haptics.selectionAsync().catch(() => {});
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
               onChange(option.value);
             }}
             style={styles.item}

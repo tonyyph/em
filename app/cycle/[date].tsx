@@ -11,6 +11,7 @@ import { Screen } from "@/components/common/Screen";
 import { Section } from "@/components/common/Section";
 import { SegmentedControl } from "@/components/common/SegmentedControl";
 import { TextField } from "@/components/forms/TextField";
+import { asIconName } from "@/components/common/icon";
 import { useTheme } from "@/design/theme";
 import { radius, spacing } from "@/design/tokens";
 import type { FlowIntensity } from "@/domain/entities/cycle";
@@ -184,7 +185,7 @@ export default function CycleDetailScreen() {
             <Chip
               key={symptom.type}
               label={symptom.label}
-              icon={symptom.icon as never}
+              icon={asIconName(symptom.icon)}
               selected={selected.has(symptom.type)}
               onPress={() => toggle(symptom.type)}
             />
