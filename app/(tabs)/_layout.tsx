@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router";
+import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "@/design/theme";
 import { layout, radius, spacing } from "@/design/tokens";
@@ -59,6 +60,43 @@ function LogTabButton({ onPress, accessibilityState }: TabBarButtonProps) {
   );
 }
 
+/**
+ * The bar reads as frosted paper rather than as an opaque strip laid over the
+ * page: content scrolling underneath stays faintly visible, which is what makes
+ * the bar feel like part of the page instead of a lid on it.
+ *
+ * iOS only. Android's blur is expensive to composite and lands somewhere
+ * between "frosted" and "smeared", so it keeps the solid ground — the same
+ * decision the atmosphere texture makes about dark mode.
+ */
+function FrostedBar() {
+  const { colors, isDark } = useTheme();
+
+  if (Platform.OS !== "ios") {
+    return <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface }]} />;
+  }
+
+  return (
+    <BlurView
+      intensity={40}
+      tint={isDark ? "dark" : "light"}
+      style={StyleSheet.absoluteFill}
+    >
+      {/*
+        A wash of the surface colour on top of the blur. Without it the frost
+        takes its tone from whatever is scrolling past and the bar drifts cool,
+        which on this palette reads as a different app.
+      */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: colors.surface, opacity: isDark ? 0.72 : 0.62 }
+        ]}
+      />
+    </BlurView>
+  );
+}
+
 export default function TabsLayout() {
   const { colors, elevation } = useTheme();
 
@@ -78,10 +116,15 @@ export default function TabsLayout() {
           fontSize: 10.5,
           letterSpacing: 0.2
         },
+        tabBarBackground: () => <FrostedBar />,
         tabBarStyle: {
+          // Absolute so the page scrolls under the frost rather than stopping
+          // at it. Screen already reserves `tabBarHeight` at the foot of its
+          // scroll content, so nothing ends up trapped behind the bar.
+          position: "absolute",
           borderTopWidth: StyleSheet.hairlineWidth,
           borderTopColor: colors.border,
-          backgroundColor: colors.surface,
+          backgroundColor: "transparent",
           minHeight: layout.tabBarHeight,
           paddingTop: spacing.xs,
           paddingBottom: Platform.OS === "ios" ? 0 : spacing.xs,

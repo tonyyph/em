@@ -1,5 +1,6 @@
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { LinearGradient } from "expo-linear-gradient";
 import { AppText } from "./AppText";
 import { Tappable } from "./Tappable";
 import type { PhaseName } from "@/design/palettes";
@@ -65,6 +66,21 @@ export function MetricCard({
         style
       ]}
     >
+      {/*
+        A single stop of light across the card, from its own ground to the
+        page's surface. It is barely perceptible on purpose — enough that the
+        card catches light like stock rather than sitting as a flat swatch, not
+        enough to read as a gradient. A view-level gradient rather than SVG
+        because it has to follow the card's rounded corners.
+      */}
+      <LinearGradient
+        colors={[ground, colors.surface]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.6, y: 1 }}
+        style={[StyleSheet.absoluteFill, styles.gradient]}
+        pointerEvents="none"
+      />
+
       <View style={styles.head}>
         <View style={[styles.rule, { backgroundColor: accent }]} />
         <AppText variant="eyebrow" color="textMuted" style={styles.label} numberOfLines={2}>
@@ -98,6 +114,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
     borderWidth: StyleSheet.hairlineWidth
+  },
+  gradient: {
+    // Matches the card's own radius rather than relying on `overflow: hidden`,
+    // which would clip the warm shadow the card is drawn with.
+    borderRadius: radius.lg
   },
   head: {
     flexDirection: "row",

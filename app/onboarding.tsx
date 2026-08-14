@@ -1,14 +1,30 @@
-import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { StyleSheet, View } from "react-native";
 import { router } from "expo-router";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  runOnJS,
+  SlideInLeft,
+  SlideInRight,
+  SlideOutLeft,
+  SlideOutRight,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming
+} from "react-native-reanimated";
 import { AppText } from "@/components/common/AppText";
 import { Button } from "@/components/common/Button";
 import { Chip } from "@/components/common/Chip";
 import { InfoBanner } from "@/components/common/InfoBanner";
+import { Reveal } from "@/components/common/Reveal";
 import { Screen } from "@/components/common/Screen";
+import { Tappable } from "@/components/common/Tappable";
 import { useTheme } from "@/design/theme";
+import { curves } from "@/design/motion";
 import { motion, radius, spacing } from "@/design/tokens";
 import type { HealthGoal } from "@/domain/entities/cycle";
 import { useAppStore } from "@/store/appStore";
@@ -46,109 +62,178 @@ const KEY_POINTS = [
   "Medically responsible language"
 ];
 
+/**
+ * One bar of the progress rule.
+ *
+ * Extracted so each segment can own its own fill animation — a row of bars that
+ * merely switch colour is the difference between an app that was designed and
+ * one that was assembled.
+ */
+function ProgressSegment({ filled, reduceMotion }: { filled: boolean; reduceMotion: boolean }) {
+  const { colors } = useTheme();
+  const fill = useSharedValue(filled ? 1 : 0);
+
+  useEffect(() => {
+    fill.value = reduceMotion
+      ? filled
+        ? 1
+        : 0
+      : withTiming(filled ? 1 : 0, {
+          duration: motion.duration.considered,
+          easing: Easing.bezier(...curves.enter)
+        });
+  }, [fill, filled, reduceMotion]);
+
+  const style = useAnimatedStyle(() => ({ transform: [{ scaleX: fill.value }] }));
+
+  return (
+    <View style={[styles.progressTrack, { backgroundColor: colors.separator }]}>
+      <Animated.View
+        style={[styles.progressFill, { backgroundColor: colors.brandAction }, style]}
+      />
+    </View>
+  );
+}
+
 export default function OnboardingScreen() {
   const { colors, reduceMotion } = useTheme();
   const [index, setIndex] = useState(0);
+  // Slides enter from the side they were travelling towards, so going back
+  // genuinely reads as going back rather than as another forward step.
+  const [goingBack, setGoingBack] = useState(false);
   const cycleConfig = useAppStore((state) => state.cycleConfig);
   const updateCycleConfig = useAppStore((state) => state.updateCycleConfig);
 
   const slide = SLIDES[index];
   const isLast = index === SLIDES.length - 1;
 
+  const go = useCallback((delta: number) => {
+    setGoingBack(delta < 0);
+    setIndex((current) => Math.min(SLIDES.length - 1, Math.max(0, current + delta)));
+  }, []);
+
+  // Swiping is how people expect to move through an intro, and an intro that
+  // only responds to its own button is the first thing the app teaches them.
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-20, 20])
+    .onEnd((event) => {
+      "worklet";
+      if (event.translationX < -40) {
+        runOnJS(go)(1);
+      } else if (event.translationX > 40) {
+        runOnJS(go)(-1);
+      }
+    });
+
+  const entering = goingBack ? SlideInLeft : SlideInRight;
+  const exiting = goingBack ? SlideOutRight : SlideOutLeft;
+
   return (
     <Screen scroll={false} padded={false} contentStyle={styles.root}>
       <View>
-        <View style={styles.brandMark}>
-          <View style={[styles.brandStem, { backgroundColor: colors.brandAction }]} />
-          <AppText variant="label">Ẽm</AppText>
-        </View>
+        <Reveal index={0}>
+          <View style={styles.brandMark}>
+            <View style={[styles.brandStem, { backgroundColor: colors.brandAction }]} />
+            <AppText variant="label">Ẽm</AppText>
+          </View>
+        </Reveal>
 
-        <View style={styles.progressRow}>
+        <Reveal index={1} style={styles.progressRow}>
           {SLIDES.map((item, position) => (
-            <View
+            <ProgressSegment
               key={item.eyebrow}
-              style={[
-                styles.progressSegment,
-                {
-                  backgroundColor:
-                    position <= index ? colors.brandAction : colors.separator
-                }
-              ]}
+              filled={position <= index}
+              reduceMotion={reduceMotion}
             />
           ))}
-        </View>
+        </Reveal>
       </View>
 
-      <Animated.View
-        key={slide.eyebrow}
-        entering={reduceMotion ? undefined : FadeIn.duration(motion.duration.considered)}
-        exiting={reduceMotion ? undefined : FadeOut.duration(motion.duration.quick)}
-        style={styles.copy}
-      >
-        <AppText variant="eyebrow" color="textMuted">
-          {slide.eyebrow}
-        </AppText>
-        <AppText variant="display" style={styles.title}>
-          {slide.title}
-        </AppText>
-        <AppText variant="body" color="textSecondary" style={styles.body}>
-          {slide.body}
-        </AppText>
+      <GestureDetector gesture={swipe}>
+        <Animated.View
+          key={slide.eyebrow}
+          entering={
+            reduceMotion ? undefined : entering.duration(motion.duration.considered)
+          }
+          exiting={reduceMotion ? undefined : exiting.duration(motion.duration.base)}
+          style={styles.copy}
+        >
+          <AppText variant="eyebrow" color="textMuted">
+            {slide.eyebrow}
+          </AppText>
+          <AppText variant="display" style={styles.title}>
+            {slide.title}
+          </AppText>
+          <AppText variant="body" color="textSecondary" style={styles.body}>
+            {slide.body}
+          </AppText>
 
-        {isLast ? (
-          <View style={styles.goalGrid}>
-            {GOALS.map((goal) => {
-              const selected = cycleConfig.goal === goal.value;
-              return (
-                <Pressable
-                  key={goal.value}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  onPress={() => updateCycleConfig({ goal: goal.value })}
-                  style={[
-                    styles.goal,
-                    {
-                      backgroundColor: selected ? colors.brandAction : colors.surface,
-                      borderColor: selected ? colors.brandAction : colors.border
-                    }
-                  ]}
-                >
-                  <Ionicons
-                    name={goal.icon}
-                    size={20}
-                    color={selected ? colors.textOnAction : colors.brandAction}
-                  />
-                  <AppText
-                    variant="label"
-                    color={selected ? "textOnAction" : "textPrimary"}
-                    numberOfLines={2}
-                  >
-                    {goal.label}
-                  </AppText>
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : (
-          <View style={styles.keyPoints}>
-            {KEY_POINTS.map((item) => (
-              <Chip key={item} label={item} />
-            ))}
-          </View>
-        )}
-      </Animated.View>
+          {isLast ? (
+            <View style={styles.goalGrid}>
+              {GOALS.map((goal, position) => {
+                const selected = cycleConfig.goal === goal.value;
+                return (
+                  // The goal cards are the one moment onboarding asks for a
+                  // decision, so they arrive one after another rather than as a
+                  // wall of five.
+                  <Reveal key={goal.value} index={position} style={styles.goalSlot}>
+                    <Tappable
+                      haptic="selection"
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={goal.label}
+                      onPress={() => updateCycleConfig({ goal: goal.value })}
+                      style={[
+                        styles.goal,
+                        {
+                          backgroundColor: selected ? colors.brandAction : colors.surface,
+                          borderColor: selected ? colors.brandAction : colors.border
+                        }
+                      ]}
+                    >
+                      <Ionicons
+                        name={goal.icon}
+                        size={20}
+                        color={selected ? colors.textOnAction : colors.brandAction}
+                      />
+                      <AppText
+                        variant="label"
+                        color={selected ? "textOnAction" : "textPrimary"}
+                        numberOfLines={2}
+                      >
+                        {goal.label}
+                      </AppText>
+                    </Tappable>
+                  </Reveal>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={styles.keyPoints}>
+              {KEY_POINTS.map((item, position) => (
+                <Reveal key={item} index={position + 1}>
+                  <Chip label={item} />
+                </Reveal>
+              ))}
+            </View>
+          )}
+        </Animated.View>
+      </GestureDetector>
 
       <View style={styles.footer}>
         {isLast ? (
-          <InfoBanner
-            title="Not a diagnostic tool"
-            body="Ẽm supports personal tracking and helps you prepare for conversations with a clinician."
-            tone="warning"
-          />
+          <Animated.View
+            entering={reduceMotion ? undefined : FadeIn.duration(motion.duration.considered)}
+            exiting={reduceMotion ? undefined : FadeOut.duration(motion.duration.quick)}
+          >
+            <InfoBanner
+              title="Not a diagnostic tool"
+              body="Ẽm supports personal tracking and helps you prepare for conversations with a clinician."
+              tone="warning"
+            />
+          </Animated.View>
         ) : null}
-        <Button
-          onPress={() => (isLast ? router.replace("/auth/login") : setIndex(index + 1))}
-        >
+        <Button onPress={() => (isLast ? router.replace("/auth/login") : go(1))}>
           {isLast ? "Set up Ẽm" : "Continue"}
         </Button>
         <Button variant="text" onPress={() => router.replace("/(tabs)")}>
@@ -183,10 +268,19 @@ const styles = StyleSheet.create({
     gap: spacing.xxs,
     marginTop: spacing.xl
   },
-  progressSegment: {
+  progressTrack: {
     flex: 1,
     height: 4,
-    borderRadius: radius.full
+    borderRadius: radius.full,
+    overflow: "hidden"
+  },
+  progressFill: {
+    width: "100%",
+    height: "100%",
+    borderRadius: radius.full,
+    // Grows from the left rather than the centre, so the rule reads as filling
+    // in the direction of travel.
+    transformOrigin: "left"
   },
   copy: {
     paddingVertical: spacing.xl
@@ -210,8 +304,10 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.lg
   },
+  goalSlot: {
+    width: "47.5%"
+  },
   goal: {
-    width: "47.5%",
     minHeight: 96,
     borderRadius: radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
