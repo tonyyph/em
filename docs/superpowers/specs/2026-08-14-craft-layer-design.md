@@ -139,11 +139,22 @@ the rule does not quietly rot back to one tier.
 
 ### 1.5 Loading, empty, and error states
 
-Every screen gets all three. Skeletons shimmer in warm tones drawn from
-`surfaceMuted`/`backgroundSunken` — a grey shimmer on warm paper reads as dirt,
-the same reason the shadows are warm.
+**Revised during implementation — skeletons were built and then removed.**
 
-`EmptyState` already exists and is extended rather than replaced.
+The plan called for warm-toned skeletons on every screen. Building them
+surfaced the reason they cannot exist here: `appStore` is fully synchronous.
+There is no persistence layer to hydrate from, no network call, and
+`useBootstrapDemoData` seeds its data inside a `useEffect` with no async step.
+Nothing in the app is ever in a loading state, so a skeleton would be a
+component that renders for zero frames.
+
+Shipping it anyway would have been the exact failure the app's own copy calls
+out on the Care screen — a surface that is designed but not connected. The
+component was deleted rather than left in the tree.
+
+Empty states remain real and stay with `EmptyState`, which several screens
+already use. If persistence or sync is added later, skeletons become worth
+building at that point, against a loading state that actually exists.
 
 ### 1.6 Bottom sheet system
 

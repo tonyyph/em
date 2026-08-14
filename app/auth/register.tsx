@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { router } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
 import { AppHeader } from "@/components/common/AppHeader";
 import { Button } from "@/components/common/Button";
 import { InfoBanner } from "@/components/common/InfoBanner";
+import { Reveal } from "@/components/common/Reveal";
 import { Screen } from "@/components/common/Screen";
 import { TextField } from "@/components/forms/TextField";
 import { authService } from "@/services/firebase/authService";
@@ -31,18 +32,20 @@ export default function RegisterScreen() {
 
   return (
     <Screen>
-      <AppHeader eyebrow="Secure profile" title="Create account" subtitle="Use this when you are ready for cloud sync across devices." />
+      <Reveal index={0}>
+        <AppHeader eyebrow="Secure profile" title="Create account" subtitle="Use this when you are ready for cloud sync across devices." />
+      </Reveal>
       {!authService.isConfigured() ? (
         <InfoBanner title="Firebase is not connected yet" body="Use anonymous mode from sign-in until project credentials are added." tone="warning" />
       ) : null}
-      <View style={styles.form}>
+      <Reveal index={2} style={styles.form}>
         <TextField label="Name" value={displayName} onChangeText={setDisplayName} textContentType="name" />
         <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" textContentType="emailAddress" />
         <TextField label="Password" value={password} onChangeText={setPassword} secureTextEntry textContentType="newPassword" error={error} />
         <Button loading={loading} onPress={register}>
           Create secure account
         </Button>
-      </View>
+      </Reveal>
     </Screen>
   );
 }
