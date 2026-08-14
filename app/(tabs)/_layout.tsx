@@ -1,5 +1,11 @@
-import type { GestureResponderEvent } from "react-native";
-import { Platform, Pressable, StyleSheet, View, type ColorValue } from "react-native";
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type ColorValue,
+  type GestureResponderEvent
+} from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router";
 import * as Haptics from "expo-haptics";
@@ -60,6 +66,11 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        // Tabs cross-fade instead of cutting. The 12px rise that completes the
+        // transition is not something the navigator can express, so it comes
+        // from each screen's own <Reveal> choreography — the fade hands over to
+        // the content arriving, and the two read as one movement.
+        animation: "fade",
         tabBarActiveTintColor: colors.brandAction,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarLabelStyle: {

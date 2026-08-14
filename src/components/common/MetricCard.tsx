@@ -1,6 +1,7 @@
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppText } from "./AppText";
+import { Tappable } from "./Tappable";
 import type { PhaseName } from "@/design/palettes";
 import { useTheme } from "@/design/theme";
 import { radius, spacing } from "@/design/tokens";
@@ -17,6 +18,12 @@ type MetricCardProps = {
    * about: "estimate", "±3 days", "needs more history".
    */
   qualifier?: string;
+  /**
+   * Opens the detail behind the number. A card that shows a prediction but
+   * cannot explain it is the kind of dead end that makes an app feel like a
+   * mock-up, so most call sites should pass this.
+   */
+  onPress?: () => void;
   style?: ViewStyle;
 };
 
@@ -27,6 +34,7 @@ export function MetricCard({
   phase,
   icon,
   qualifier,
+  onPress,
   style
 }: MetricCardProps) {
   const { colors, elevation } = useTheme();
@@ -34,11 +42,25 @@ export function MetricCard({
   const accent = phase ? colors.phases[phase] : colors.textMuted;
   const ground = phase ? colors.phaseSoft[phase] : colors.surface;
 
+  // A card is a large target, so it takes a gentler press than a button — at
+  // the button's scale a full-width surface looks like it is collapsing.
+  const Container = onPress ? Tappable : View;
+  const interaction = onPress
+    ? ({
+        onPress,
+        scale: 0.99,
+        haptic: "light" as const,
+        accessibilityRole: "button" as const,
+        accessibilityLabel: `${label}: ${value}${qualifier ? `, ${qualifier}` : ""}`
+      } as const)
+    : undefined;
+
   return (
-    <View
+    <Container
+      {...interaction}
       style={[
         styles.root,
-        elevation.raised,
+        onPress ? elevation.lifted : elevation.raised,
         { backgroundColor: ground, borderColor: phase ? "transparent" : colors.border },
         style
       ]}
@@ -66,7 +88,7 @@ export function MetricCard({
           {detail}
         </AppText>
       ) : null}
-    </View>
+    </Container>
   );
 }
 

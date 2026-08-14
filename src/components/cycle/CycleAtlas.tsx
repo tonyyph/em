@@ -84,7 +84,6 @@ export function CycleAtlas({ date, cycles, prediction, cycleDay }: CycleAtlasPro
   ].filter((segment) => segment.to - segment.from > 0.6);
 
   const progressAngle = toAngle(safeCycleDay - 0.5);
-  const marker = polar(RING_R, progressAngle);
 
   // The marker travels from the top of the dial to today's position, so the
   // ring reads as a clock face being wound rather than as a static chart.

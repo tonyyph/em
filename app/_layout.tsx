@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
 // Imported per weight, not from the package root: the root index re-exports
@@ -18,6 +19,7 @@ import { BeVietnamPro_500Medium } from "@expo-google-fonts/be-vietnam-pro/500Med
 import { BeVietnamPro_600SemiBold } from "@expo-google-fonts/be-vietnam-pro/600SemiBold";
 import { BeVietnamPro_700Bold } from "@expo-google-fonts/be-vietnam-pro/700Bold";
 import { ThemeProvider, useTheme } from "@/design/theme";
+import { motion } from "@/design/tokens";
 import { useBootstrapDemoData } from "@/hooks/useBootstrapDemoData";
 
 const queryClient = new QueryClient();
@@ -42,15 +44,23 @@ function ThemedShell() {
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: colors.background }
+          contentStyle: { backgroundColor: colors.background },
+          // Auth and onboarding are a linear story, so they keep a horizontal
+          // push. Everything that is a detour off the tabs is handled per
+          // screen below.
+          animation: "slide_from_right",
+          animationDuration: motion.duration.base
         }}
       >
-        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
         <Stack.Screen name="auth/login" />
         <Stack.Screen name="auth/register" />
         <Stack.Screen name="auth/forgot-password" />
-        <Stack.Screen name="cycle/[date]" options={{ presentation: "modal" }} />
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="cycle/[date]"
+          options={{ presentation: "modal", animation: "slide_from_bottom" }}
+        />
+        <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
       </Stack>
     </>
   );
@@ -85,8 +95,10 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
-            <Bootstrap />
-            <ThemedShell />
+            <BottomSheetModalProvider>
+              <Bootstrap />
+              <ThemedShell />
+            </BottomSheetModalProvider>
           </ThemeProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

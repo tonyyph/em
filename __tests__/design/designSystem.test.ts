@@ -1,5 +1,8 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { darkColors, lightColors, type ThemeColors } from "@/design/palettes";
 import { phaseMeta, phaseOrder, typography } from "@/design/tokens";
+import { STAGGER_CAP, STAGGER_STEP, curves, staggerDelay } from "@/design/motion";
 import { symptomCatalog } from "@/domain/entities/symptom";
 import type { SymptomType } from "@/domain/entities/symptom";
 
@@ -149,5 +152,78 @@ describe("phase metadata", () => {
       expect(phaseMeta[phase]).toBeDefined();
       expect(phaseMeta[phase].shortLabel.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("motion vocabulary", () => {
+  it("keeps the design layer importable without a native runtime", () => {
+    // The curves are bezier tuples rather than Reanimated `Easing` objects so
+    // that this suite — which runs on `testEnvironment: "node"` with no Expo
+    // preset — can reach the token system at all. If someone converts them to
+    // Easing calls, this import fails and says so.
+    expect(Object.keys(curves).sort()).toEqual(["emphasis", "enter", "exit", "settle"]);
+  });
+
+  it("keeps every curve a well-formed bezier", () => {
+    for (const [name, curve] of Object.entries(curves)) {
+      expect(curve).toHaveLength(4);
+      // CSS requires the two x controls inside [0,1]; y may overshoot, which is
+      // exactly how `emphasis` gets its overshoot.
+      expect(curve[0]).toBeGreaterThanOrEqual(0);
+      expect(curve[0]).toBeLessThanOrEqual(1);
+      expect(curve[2]).toBeGreaterThanOrEqual(0);
+      expect(curve[2]).toBeLessThanOrEqual(1);
+      expect(name).toBeTruthy();
+    }
+  });
+
+  it("overshoots on emphasis and nowhere else", () => {
+    expect(curves.emphasis[1]).toBeGreaterThan(1);
+    for (const name of ["enter", "exit", "settle"] as const) {
+      expect(curves[name][1]).toBeLessThanOrEqual(1);
+      expect(curves[name][3]).toBeLessThanOrEqual(1);
+    }
+  });
+
+  /**
+   * Regression guard for the reason the cap exists: uncapped, the twenty-one
+   * entry symptom catalog would still be arriving more than a second after the
+   * screen opened, and the last items would read as broken rather than staged.
+   */
+  it("caps the staggered entrance so long lists still land promptly", () => {
+    expect(staggerDelay(0)).toBe(0);
+    expect(staggerDelay(3)).toBe(3 * STAGGER_STEP);
+    expect(staggerDelay(50)).toBe(STAGGER_CAP * STAGGER_STEP);
+    expect(staggerDelay(50)).toBeLessThanOrEqual(400);
+  });
+
+  it("treats a negative index as the head of the sequence", () => {
+    expect(staggerDelay(-1)).toBe(0);
+  });
+});
+
+/**
+ * Depth is a three-tier system in `theme.tsx`, and before this work only one
+ * tier was ever used — every card sat at exactly the same height, which is why
+ * the app read as flat. These assertions keep the other two in service.
+ */
+describe("elevation tiers", () => {
+  const ROOTS = [join(__dirname, "../../src"), join(__dirname, "../../app")];
+
+  const sourceFiles = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        return sourceFiles(path);
+      }
+      return /\.tsx?$/.test(entry.name) ? [path] : [];
+    });
+
+  const corpus = ROOTS.flatMap(sourceFiles)
+    .map((path) => readFileSync(path, "utf8"))
+    .join("\n");
+
+  it.each(["raised", "lifted", "sheet"])("puts elevation.%s to work somewhere", (tier) => {
+    expect(corpus).toContain(`elevation.${tier}`);
   });
 });
