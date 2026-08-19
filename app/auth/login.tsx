@@ -10,11 +10,11 @@ import { Screen } from "@/components/common/Screen";
 import { TextField } from "@/components/forms/TextField";
 import { authService } from "@/services/firebase/authService";
 import { describeAuthError } from "@/services/firebase/authErrors";
-import { useTheme } from "@/design/theme";
-import { radius, spacing } from "@/design/tokens";
+import { EmMark } from "@/design/brand/EmMark";
+import { MomentArt } from "@/design/brand/MomentArt";
+import { spacing } from "@/design/tokens";
 
 export default function LoginScreen() {
-  const { colors } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string>();
@@ -47,7 +47,7 @@ export default function LoginScreen() {
     <Screen>
       <Reveal index={0}>
         <View style={styles.brandMark}>
-          <View style={[styles.brandStem, { backgroundColor: colors.brandAction }]} />
+          <EmMark size={26} />
           <AppText variant="label">Ẽm</AppText>
         </View>
       </Reveal>
@@ -58,10 +58,13 @@ export default function LoginScreen() {
           subtitle="Sign in to sync, or stay entirely local with anonymous mode."
         />
       </Reveal>
+      <Reveal index={2}>
+        <MomentArt name="auth" height={124} style={styles.art} />
+      </Reveal>
       {!authService.isConfigured() ? (
         <InfoBanner title="Cloud sync is not configured" body="The app still runs in local anonymous mode. Fill .env to enable email auth." tone="warning" />
       ) : null}
-      <Reveal index={2} style={styles.form}>
+      <Reveal index={3} style={styles.form}>
         <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" textContentType="emailAddress" />
         <TextField label="Password" value={password} onChangeText={setPassword} secureTextEntry textContentType="password" error={error} />
         <Button loading={loading} onPress={login}>
@@ -71,7 +74,7 @@ export default function LoginScreen() {
           Continue anonymously
         </Button>
       </Reveal>
-      <Reveal index={3} style={styles.links}>
+      <Reveal index={4} style={styles.links}>
         <Link href="/auth/register">
           <AppText variant="label" color="brandAction">Create account</AppText>
         </Link>
@@ -90,11 +93,8 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginTop: spacing.md
   },
-  brandStem: {
-    width: 14,
-    height: 32,
-    borderRadius: radius.full,
-    transform: [{ rotate: "18deg" }]
+  art: {
+    marginTop: spacing.lg
   },
   form: {
     marginTop: spacing.xl,

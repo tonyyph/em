@@ -4,6 +4,7 @@ import { AppHeader } from "@/components/common/AppHeader";
 import { AppText } from "@/components/common/AppText";
 import { Button } from "@/components/common/Button";
 import { Reveal } from "@/components/common/Reveal";
+import { MomentArt } from "@/design/brand/MomentArt";
 import { Screen } from "@/components/common/Screen";
 import { TextField } from "@/components/forms/TextField";
 import { authService } from "@/services/firebase/authService";
@@ -32,7 +33,10 @@ export default function ForgotPasswordScreen() {
       <Reveal index={0}>
         <AppHeader eyebrow="Account recovery" title="Reset password" subtitle="We only send reset email through Firebase Auth when cloud auth is configured." />
       </Reveal>
-      <Reveal index={1} style={styles.form}>
+      <Reveal index={1}>
+        <MomentArt name="auth" height={112} style={styles.art} />
+      </Reveal>
+      <Reveal index={2} style={styles.form}>
         <TextField label="Email" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" />
         {message ? (
           <AppText variant="supporting" color="textSecondary" style={styles.message}>
@@ -48,6 +52,9 @@ export default function ForgotPasswordScreen() {
 }
 
 const styles = StyleSheet.create({
+  art: {
+    marginTop: spacing.lg
+  },
   form: {
     marginTop: spacing.xl
   },

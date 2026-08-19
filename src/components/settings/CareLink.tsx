@@ -25,11 +25,13 @@ export function CareLink({ href, icon, title, body }: CareLinkProps) {
         scale={0.99}
         accessibilityRole="link"
         accessibilityLabel={`${title}. ${body}`}
-        style={[
+        // Flattened because `Link asChild` hands this straight to expo-router's
+        // <Slot>, which rejects an array of styles on its child.
+        style={StyleSheet.flatten([
           styles.root,
           elevation.raised,
           { backgroundColor: colors.surface, borderColor: colors.border }
-        ]}
+        ])}
       >
         <View style={[styles.icon, { backgroundColor: colors.brandActionSoft }]}>
           <Ionicons name={icon} size={19} color={colors.brandAction} />

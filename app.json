@@ -12,13 +12,23 @@
       "bundleIdentifier": "com.em.cyclehealth",
       "infoPlist": {
         "NSFaceIDUsageDescription": "Ẽm uses Face ID to protect your private health data."
+      },
+      "icon": {
+        "light": "./assets/icon/icon-ios.png",
+        "dark": "./assets/icon/icon-ios-dark.png",
+        "tinted": "./assets/icon/icon-ios-tinted.png"
       }
     },
     "android": {
       "package": "com.em.cyclehealth",
       "permissions": [
         "POST_NOTIFICATIONS"
-      ]
+      ],
+      "icon": "./assets/icon/icon-android.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon/adaptive-icon.png",
+        "backgroundColor": "#FBF6EF"
+      }
     },
     "plugins": [
       "expo-router",
@@ -35,8 +45,12 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/splash/splash-mark.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
           "backgroundColor": "#FBF6EF",
           "dark": {
+            "image": "./assets/splash/splash-mark-dark.png",
             "backgroundColor": "#141010"
           }
         }

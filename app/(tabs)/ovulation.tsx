@@ -8,6 +8,7 @@ import { Reveal } from "@/components/common/Reveal";
 import { Screen } from "@/components/common/Screen";
 import { Section } from "@/components/common/Section";
 import { EmptyState } from "@/components/feedback/EmptyState";
+import { MomentArt } from "@/design/brand/MomentArt";
 import { useOvulation } from "@/hooks/useOvulation";
 import { spacing } from "@/design/tokens";
 import { dayjs } from "@/utils/date/dayjs";
@@ -33,7 +34,14 @@ export default function OvulationScreen() {
         />
       </Reveal>
 
-      <Reveal index={1}>
+      <Reveal index={1} style={styles.art}>
+        <MomentArt
+          name="ovulation"
+          label="A landscape cresting to a single peak, ringed by two fainter halos — the estimated day, and how wide that estimate is."
+        />
+      </Reveal>
+
+      <Reveal index={2}>
         <HeroMetric
           eyebrow="Estimated ovulation"
           value={daysToOvulation}
@@ -47,7 +55,7 @@ export default function OvulationScreen() {
         />
       </Reveal>
 
-      <Reveal index={2} style={styles.metrics}>
+      <Reveal index={3} style={styles.metrics}>
         <MetricCard
           label="Window starts"
           value={dayjs(prediction.fertileWindowStart).format("MMM D")}
@@ -66,7 +74,7 @@ export default function OvulationScreen() {
         />
       </Reveal>
 
-      <Reveal index={3}>
+      <Reveal index={4}>
         <Section
           title="Optional signals"
           description="None of these are required. They narrow the estimate when the calendar alone cannot."
@@ -86,10 +94,11 @@ export default function OvulationScreen() {
         </Section>
       </Reveal>
 
-      <Reveal index={4}>
+      <Reveal index={5}>
         <Section title="Recent logs">
           {ovulationLogs.length === 0 ? (
             <EmptyState
+              art="signals"
               title="No ovulation-specific logs yet"
               body="BBT, LH, and mucus tracking are optional and can be added after the core log feels useful."
             />
@@ -105,7 +114,7 @@ export default function OvulationScreen() {
         </Section>
       </Reveal>
 
-      <Reveal index={5}>
+      <Reveal index={6}>
         <InfoBanner
           title="Medical responsibility"
           body="Use clinician-backed contraception if avoiding pregnancy. Cycle prediction alone is not reliable enough."
@@ -117,6 +126,9 @@ export default function OvulationScreen() {
 }
 
 const styles = StyleSheet.create({
+  art: {
+    marginBottom: spacing.lg
+  },
   metrics: {
     flexDirection: "row",
     gap: spacing.md

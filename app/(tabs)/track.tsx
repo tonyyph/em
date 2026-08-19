@@ -130,11 +130,13 @@ export default function TrackScreen() {
             scale={0.99}
             accessibilityRole="button"
             accessibilityLabel={`Open the full log for ${dayjs(selectedDate).format("MMMM D")}`}
-            style={[
+            // Flattened: `Link asChild` passes this to <Slot>, which rejects
+            // an array of styles on its child.
+            style={StyleSheet.flatten([
               styles.hero,
               elevation.lifted,
               { backgroundColor: colors.surface, borderColor: colors.border }
-            ]}
+            ])}
           >
             <View style={[styles.heroIcon, { backgroundColor: colors.brandActionSoft }]}>
               <Ionicons name="pulse-outline" size={22} color={colors.brandAction} />

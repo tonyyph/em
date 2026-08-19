@@ -13,7 +13,8 @@
     "lint": "expo lint && npx tsc --noEmit",
     "all": "watchman watch-del-all && rm -rf yarn.lock && rm -rf node_modules/",
     "setup": "npx expo install",
-    "prebuild": "npx expo prebuild --no-install"
+    "prebuild": "npx expo prebuild --no-install",
+    "assets:build": "tsc -p scripts/tsconfig.build.json && node .assets-build/scripts/build-brand-assets.js"
   },
   "dependencies": {
     "@expo-google-fonts/be-vietnam-pro": "^0.4.1",

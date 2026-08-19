@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
@@ -18,6 +18,7 @@ import { BeVietnamPro_400Regular } from "@expo-google-fonts/be-vietnam-pro/400Re
 import { BeVietnamPro_500Medium } from "@expo-google-fonts/be-vietnam-pro/500Medium";
 import { BeVietnamPro_600SemiBold } from "@expo-google-fonts/be-vietnam-pro/600SemiBold";
 import { BeVietnamPro_700Bold } from "@expo-google-fonts/be-vietnam-pro/700Bold";
+import { SplashOverlay } from "@/components/common/SplashOverlay";
 import { ThemeProvider, useTheme } from "@/design/theme";
 import { motion } from "@/design/tokens";
 import { useBootstrapDemoData } from "@/hooks/useBootstrapDemoData";
@@ -37,6 +38,12 @@ function Bootstrap() {
  */
 function ThemedShell() {
   const { isDark, colors } = useTheme();
+  // The overlay is the runtime half of the launch: the native splash has
+  // already shown the same mark on the same ground, and this carries it into
+  // the first screen. It sits above the router rather than in front of it, so
+  // the app below is mounted and interactive the whole time it plays.
+  const [launching, setLaunching] = useState(true);
+  const finishLaunch = useCallback(() => setLaunching(false), []);
 
   return (
     <>
@@ -62,6 +69,7 @@ function ThemedShell() {
         />
         <Stack.Screen name="(tabs)" options={{ animation: "fade" }} />
       </Stack>
+      {launching ? <SplashOverlay onFinish={finishLaunch} /> : null}
     </>
   );
 }

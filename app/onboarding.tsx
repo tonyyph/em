@@ -23,11 +23,23 @@ import { InfoBanner } from "@/components/common/InfoBanner";
 import { Reveal } from "@/components/common/Reveal";
 import { Screen } from "@/components/common/Screen";
 import { Tappable } from "@/components/common/Tappable";
+import { EmMark } from "@/design/brand/EmMark";
+import { OnboardingArt, type OnboardingSceneName } from "@/design/brand/OnboardingArt";
 import { useTheme } from "@/design/theme";
 import { curves } from "@/design/motion";
 import { motion, radius, spacing } from "@/design/tokens";
 import type { HealthGoal } from "@/domain/entities/cycle";
 import { useAppStore } from "@/store/appStore";
+
+/**
+ * The scene each slide is told over.
+ *
+ * Onboarding is three steps rather than five, so it draws three moments of the
+ * five-part landscape: the terrain emerging, one contour rising into a reading
+ * with its uncertainty shown, and the mark taking the centre of what has been
+ * built. The two unused scenes stay in the brand layer for the longer flow.
+ */
+const SCENES: OnboardingSceneName[] = ["rhythm", "patterns", "together"];
 
 const SLIDES = [
   {
@@ -133,7 +145,7 @@ export default function OnboardingScreen() {
       <View>
         <Reveal index={0}>
           <View style={styles.brandMark}>
-            <View style={[styles.brandStem, { backgroundColor: colors.brandAction }]} />
+            <EmMark size={26} />
             <AppText variant="label">Ẽm</AppText>
           </View>
         </Reveal>
@@ -158,6 +170,7 @@ export default function OnboardingScreen() {
           exiting={reduceMotion ? undefined : exiting.duration(motion.duration.base)}
           style={styles.copy}
         >
+          <OnboardingArt name={SCENES[index]} height={168} style={styles.scene} />
           <AppText variant="eyebrow" color="textMuted">
             {slide.eyebrow}
           </AppText>
@@ -257,11 +270,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.xs
   },
-  brandStem: {
-    width: 14,
-    height: 32,
-    borderRadius: radius.full,
-    transform: [{ rotate: "18deg" }]
+  scene: {
+    marginBottom: spacing.lg
   },
   progressRow: {
     flexDirection: "row",

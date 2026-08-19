@@ -130,7 +130,12 @@ export default function CalendarScreen() {
                 haptic="light"
                 accessibilityRole="button"
                 accessibilityLabel={`Log ${dayjs(selectedDate).format("MMMM D")}`}
-                style={[styles.iconAction, { backgroundColor: colors.brandAction }]}
+                // Flattened: `Link asChild` passes this to <Slot>, which
+                // rejects an array of styles on its child.
+                style={StyleSheet.flatten([
+                  styles.iconAction,
+                  { backgroundColor: colors.brandAction }
+                ])}
               >
                 <Ionicons name="add" size={24} color={colors.textOnAction} />
               </Tappable>

@@ -15,6 +15,7 @@ import { MetricCard } from "@/components/common/MetricCard";
 import { Reveal } from "@/components/common/Reveal";
 import { Screen } from "@/components/common/Screen";
 import { Section } from "@/components/common/Section";
+import { MomentArt } from "@/design/brand/MomentArt";
 import { useTheme } from "@/design/theme";
 import { curves } from "@/design/motion";
 import { motion, radius, spacing } from "@/design/tokens";
@@ -158,6 +159,7 @@ export default function PregnancyScreen() {
               { backgroundColor: colors.surface, borderColor: colors.border }
             ]}
           >
+            <MomentArt name="pregnancy" height={116} style={styles.art} />
             <AppText variant="sectionTitle">Ready when pregnancy is confirmed</AppText>
             <AppText variant="supporting" color="textSecondary" style={styles.body}>
               Ẽm estimates a due date as last period start plus 280 days. A
@@ -262,6 +264,9 @@ export default function PregnancyScreen() {
 }
 
 const styles = StyleSheet.create({
+  art: {
+    marginBottom: spacing.lg
+  },
   panel: {
     borderRadius: radius.xl,
     borderWidth: StyleSheet.hairlineWidth,

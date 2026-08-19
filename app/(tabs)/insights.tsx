@@ -133,7 +133,7 @@ export default function InsightsScreen() {
             />
           ) : (
             <EmptyState
-              icon="analytics-outline"
+              art="patterns"
               title="Not enough cycles to draw a trend"
               body={`Ẽm needs at least ${MIN_CYCLES_FOR_TREND} recorded period starts before it can compare cycle to cycle. It will not invent a line from ${points.length + 1}.`}
             />
