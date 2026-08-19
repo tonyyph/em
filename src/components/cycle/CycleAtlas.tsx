@@ -24,6 +24,7 @@ import { curves } from "@/design/motion";
 import { motion, phaseMeta, radius, spacing } from "@/design/tokens";
 import type { PhaseName } from "@/design/palettes";
 import type { Cycle, CyclePrediction } from "@/domain/entities/cycle";
+import { sortCyclesByStartDate } from "@/utils/algorithms/cyclePrediction";
 import { dayjs } from "@/utils/date/dayjs";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -159,7 +160,11 @@ export function CycleAtlas({
   const cycleLength = Math.max(prediction.averageCycleLength, 14);
   const periodLength = Math.min(prediction.averagePeriodLength, cycleLength - 4);
 
-  const lastStart = cycles.at(-1)?.startDate ?? date;
+  // Sorted rather than trusting array order: the store appends on upsert and
+  // loads whatever order the repository hands back, so the last element is not
+  // reliably the most recent cycle — and every day the dial shows is measured
+  // from this date.
+  const lastStart = sortCyclesByStartDate(cycles).at(-1)?.startDate ?? date;
   const todayCycleDay = Math.min(
     cycleLength,
     Math.max(1, cycleDay ?? dayjs(date).diff(dayjs(lastStart), "day") + 1)
@@ -249,17 +254,21 @@ export function CycleAtlas({
     opacity: interpolate(draw.value, [0, 0.35, 1], [0, 0, 1], Extrapolation.CLAMP)
   }));
 
-  const applyScrub = useCallback(
-    (day: number) => {
-      setScrubbedDay((current) => {
-        if (current !== day) {
-          Haptics.selectionAsync().catch(() => {});
-        }
-        return day;
-      });
-    },
-    []
-  );
+  /**
+   * The day the gesture last reported, kept on the UI thread.
+   *
+   * A pan fires many times per day-width of travel, so the crossing to JS is
+   * filtered here rather than in `applyScrub`: only an actual change of day
+   * costs a hop, and the tick can no longer double-fire — putting that check
+   * inside a `setState` updater would, since React may run an updater more than
+   * once for a single update and a haptic is a side effect.
+   */
+  const lastScrubbedDay = useSharedValue(-1);
+
+  const applyScrub = useCallback((day: number) => {
+    Haptics.selectionAsync().catch(() => {});
+    setScrubbedDay(day);
+  }, []);
 
   const clearScrub = useCallback(() => setScrubbedDay(null), []);
 
@@ -268,23 +277,27 @@ export function CycleAtlas({
    * views: 28 invisible wedges would be the alternative, and they would have to
    * be rebuilt every time the predicted cycle length changed.
    */
+  const track = (x: number, y: number) => {
+    "worklet";
+    const day = dayFromTouch(x, y, cycleLength);
+    if (day !== null && day !== lastScrubbedDay.value) {
+      lastScrubbedDay.value = day;
+      runOnJS(applyScrub)(day);
+    }
+  };
+
   const scrub = Gesture.Pan()
     .onBegin((event) => {
       "worklet";
-      const day = dayFromTouch(event.x, event.y, cycleLength);
-      if (day !== null) {
-        runOnJS(applyScrub)(day);
-      }
+      track(event.x, event.y);
     })
     .onUpdate((event) => {
       "worklet";
-      const day = dayFromTouch(event.x, event.y, cycleLength);
-      if (day !== null) {
-        runOnJS(applyScrub)(day);
-      }
+      track(event.x, event.y);
     })
     .onFinalize(() => {
       "worklet";
+      lastScrubbedDay.value = -1;
       runOnJS(clearScrub)();
     });
 
@@ -452,6 +465,14 @@ const styles = StyleSheet.create({
     overflow: "hidden"
   },
   visual: {
+    // Sized to the SVG exactly. `Gesture.Pan` reports `event.x`/`event.y`
+    // relative to the view it is attached to, and `dayFromTouch` measures them
+    // against the SVG's own centre — a view that stretched to the card's width
+    // would offset every touch by half the difference, which is wider than the
+    // ring's grab tolerance and put the scrub on the wrong day.
+    width: SIZE,
+    height: SIZE,
+    alignSelf: "center",
     alignItems: "center",
     justifyContent: "center"
   },

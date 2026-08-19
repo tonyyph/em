@@ -7,6 +7,7 @@ import { Reveal } from "@/components/common/Reveal";
 import { Screen } from "@/components/common/Screen";
 import { TextField } from "@/components/forms/TextField";
 import { authService } from "@/services/firebase/authService";
+import { describeAuthError } from "@/services/firebase/authErrors";
 import { spacing } from "@/design/tokens";
 
 export default function ForgotPasswordScreen() {
@@ -19,8 +20,8 @@ export default function ForgotPasswordScreen() {
       setLoading(true);
       await authService.forgotPassword(email.trim());
       setMessage("Reset email sent if the account exists.");
-    } catch {
-      setMessage("Password reset needs Firebase configuration.");
+    } catch (cause) {
+      setMessage(describeAuthError(cause));
     } finally {
       setLoading(false);
     }

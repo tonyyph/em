@@ -30,19 +30,38 @@ const standardDeviation = (values: number[]) => {
 export const sortCyclesByStartDate = (cycles: Cycle[]) =>
   [...cycles].sort((a, b) => dayjs(a.startDate).valueOf() - dayjs(b.startDate).valueOf());
 
-export const getCycleLengths = (cycles: Cycle[], sampleSize = 6) => {
+/** One measured cycle: its length, and the period start that closed it. */
+export type CycleLength = {
+  value: number;
+  /** Start date of the later of the two cycles the gap was measured between. */
+  startDate: string;
+};
+
+/**
+ * Cycle lengths with the start each one was measured to.
+ *
+ * Callers that plot these need to label them, and the index of a length cannot
+ * be used to index back into the cycles: implausible gaps are dropped and the
+ * result is trimmed to the most recent `sampleSize`, so position `i` here is
+ * not position `i + 1` there. Carrying the date alongside the number is the
+ * only way a chart can stay honest about which cycle a point belongs to.
+ */
+export const getCycleLengthSeries = (cycles: Cycle[], sampleSize = 6): CycleLength[] => {
   const sorted = sortCyclesByStartDate(cycles);
-  const lengths: number[] = [];
+  const lengths: CycleLength[] = [];
 
   for (let index = 1; index < sorted.length; index += 1) {
     const length = dayjs(sorted[index].startDate).diff(dayjs(sorted[index - 1].startDate), "day");
     if (length >= 15 && length <= 60) {
-      lengths.push(length);
+      lengths.push({ value: length, startDate: sorted[index].startDate });
     }
   }
 
   return lengths.slice(-sampleSize);
 };
+
+export const getCycleLengths = (cycles: Cycle[], sampleSize = 6) =>
+  getCycleLengthSeries(cycles, sampleSize).map((entry) => entry.value);
 
 export const getPeriodLengths = (cycles: Cycle[], fallback: number) => {
   const lengths = cycles
@@ -70,7 +89,30 @@ export const predictCycle = (
       : resolvedConfig.averageCycleLength;
   const averagePeriodLength = getPeriodLengths(sorted, resolvedConfig.averagePeriodLength);
   const anchorDate = latestCycle?.startDate ?? today;
-  const nextPeriodStart = dayjs(anchorDate).add(averageCycleLength, "day");
+
+  /**
+   * The next period, rolled forward past any cycles that were never logged.
+   *
+   * One cycle length past the last recorded start is only "next" for someone
+   * who logged their last period. Stop logging for a few months and that date
+   * falls into the past, and because nothing downstream re-checks it, the app
+   * goes on presenting it as upcoming: the countdown floors at zero and reads
+   * "today", the calendar tints a week in March, and every phase is derived
+   * from a window that closed months ago.
+   *
+   * Advancing in whole cycle lengths keeps the estimate honest arithmetic on
+   * the user's own history — it is the same prediction, projected forward
+   * rather than frozen. A window still under way is kept rather than skipped,
+   * so someone bleeding today is not told their period is due in a month.
+   */
+  const rollForward = (start: dayjs.Dayjs): dayjs.Dayjs => {
+    const periodEnd = start.add(averagePeriodLength - 1, "day");
+    return periodEnd.isBefore(dayjs(today), "day")
+      ? rollForward(start.add(averageCycleLength, "day"))
+      : start;
+  };
+
+  const nextPeriodStart = rollForward(dayjs(anchorDate).add(averageCycleLength, "day"));
   const nextPeriodEnd = nextPeriodStart.add(averagePeriodLength - 1, "day");
   const ovulationDay = nextPeriodStart.subtract(14, "day");
   const fertileWindowStart = ovulationDay.subtract(5, "day");

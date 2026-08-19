@@ -20,6 +20,7 @@ import { curves } from "@/design/motion";
 import { motion, radius, spacing } from "@/design/tokens";
 import { usePregnancy } from "@/hooks/usePregnancy";
 import { useAppStore } from "@/store/appStore";
+import { sortCyclesByStartDate } from "@/utils/algorithms/cyclePrediction";
 import { calculateEddFromLastPeriod } from "@/utils/algorithms/pregnancy";
 import { dayjs, toIsoDate } from "@/utils/date/dayjs";
 import { describeCountdown } from "@/utils/format/prediction";
@@ -124,8 +125,10 @@ export default function PregnancyScreen() {
   const { pregnancy, weekInfo, setPregnancy } = usePregnancy();
 
   const activate = () => {
+    // Sorted, not last-in-array: the due date is 280 days from this, so picking
+    // the wrong cycle here is wrong by however far apart the two starts are.
     const lastPeriodStart =
-      cycles.at(-1)?.startDate ?? toIsoDate(dayjs().subtract(35, "day"));
+      sortCyclesByStartDate(cycles).at(-1)?.startDate ?? toIsoDate(dayjs().subtract(35, "day"));
     const now = new Date().toISOString();
     setPregnancy({
       id: "local-pregnancy",

@@ -21,6 +21,7 @@ import type { SymptomCategory, SymptomSeverity, SymptomType } from "@/domain/ent
 import { symptomsByCategory } from "@/domain/entities/symptom";
 import { useAppStore } from "@/store/appStore";
 import { flowOn, isPeriodDay } from "@/utils/algorithms/periodLog";
+import { reconcileSymptomLogs } from "@/utils/algorithms/symptomLog";
 import { dayjs } from "@/utils/date/dayjs";
 
 const FLOWS: { label: string; value: FlowIntensity }[] = [
@@ -98,31 +99,22 @@ export default function CycleDetailScreen() {
   };
 
   const save = () => {
-    const now = new Date().toISOString();
-
     setPeriodDay(date, bleeding ? flow : undefined);
 
     // Reconcile rather than append: anything deselected since opening the
     // screen is removed, so the log reflects the final state of the form.
-    for (const symptom of existing) {
-      if (!selected.has(symptom.type)) {
-        removeSymptom(symptom.id);
-      }
-    }
+    const { removedIds, saved: entries } = reconcileSymptomLogs(existing, {
+      date,
+      selected: [...selected],
+      severity,
+      notes
+    });
 
-    for (const type of selected) {
-      const entry = visible.find((item) => item.type === type);
-      const previous = existing.find((symptom) => symptom.type === type);
-      upsertSymptom({
-        id: previous?.id ?? `symptom-${date}-${type}`,
-        date,
-        type,
-        category: entry?.category ?? previous?.category ?? "physical",
-        severity,
-        notes: notes || undefined,
-        createdAt: previous?.createdAt ?? now,
-        updatedAt: now
-      });
+    for (const id of removedIds) {
+      removeSymptom(id);
+    }
+    for (const entry of entries) {
+      upsertSymptom(entry);
     }
 
     // A save is the one thing on this screen that cannot be taken back by

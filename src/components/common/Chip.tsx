@@ -48,8 +48,11 @@ export function Chip({
 
   return (
     <AnimatedPressable
-      accessibilityRole="button"
-      accessibilityState={{ selected, disabled }}
+      // A chip with nothing to press is a label, not a button. Announcing it as
+      // a dimmed button sends a screen-reader user hunting for a control that
+      // was never there.
+      accessibilityRole={onPress ? "button" : "text"}
+      accessibilityState={onPress ? { selected, disabled } : undefined}
       disabled={disabled || !onPress}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}

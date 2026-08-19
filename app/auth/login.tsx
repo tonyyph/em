@@ -9,6 +9,7 @@ import { Reveal } from "@/components/common/Reveal";
 import { Screen } from "@/components/common/Screen";
 import { TextField } from "@/components/forms/TextField";
 import { authService } from "@/services/firebase/authService";
+import { describeAuthError } from "@/services/firebase/authErrors";
 import { useTheme } from "@/design/theme";
 import { radius, spacing } from "@/design/tokens";
 
@@ -25,8 +26,8 @@ export default function LoginScreen() {
       setError(undefined);
       await authService.loginWithEmail(email.trim(), password);
       router.replace("/(tabs)");
-    } catch {
-      setError("Cloud sign-in is unavailable until Firebase env values are configured.");
+    } catch (cause) {
+      setError(describeAuthError(cause));
     } finally {
       setLoading(false);
     }

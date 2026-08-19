@@ -20,7 +20,7 @@ import { useTheme } from "@/design/theme";
 import { spacing } from "@/design/tokens";
 import { useCyclePredictions } from "@/hooks/useCyclePredictions";
 import { useAppStore } from "@/store/appStore";
-import { getCycleLengths, sortCyclesByStartDate } from "@/utils/algorithms/cyclePrediction";
+import { getCycleLengthSeries } from "@/utils/algorithms/cyclePrediction";
 import { dayjs } from "@/utils/date/dayjs";
 
 /** Two starts make one gap, so a trend needs at least three recorded cycles. */
@@ -47,14 +47,17 @@ export default function InsightsScreen() {
 
   // Derived from the same helper the prediction uses, so the chart and the
   // headline average can never disagree.
-  const points = useMemo<TrendPoint[]>(() => {
-    const sorted = sortCyclesByStartDate(cycles);
-    const lengths = getCycleLengths(sorted);
-    return lengths.map((value, index) => ({
-      value,
-      label: dayjs(sorted[index + 1]?.startDate ?? sorted[index].startDate).format("MMM")
-    }));
-  }, [cycles]);
+  const points = useMemo<TrendPoint[]>(
+    () =>
+      // The series carries each length's own start date. Indexing back into the
+      // cycles instead would label every point with the wrong month as soon as
+      // the history outgrew the sample window or contained one implausible gap.
+      getCycleLengthSeries(cycles).map((entry) => ({
+        value: entry.value,
+        label: dayjs(entry.startDate).format("MMM")
+      })),
+    [cycles]
+  );
 
   const hasTrend = points.length >= MIN_CYCLES_FOR_TREND - 1;
 
